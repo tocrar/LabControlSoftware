@@ -1,0 +1,8 @@
+1- compare endtime with worstcase finishing time for all tasks in the Queue.
+2- if they are schedulable --->> send the time span back for the last task arrived.
+3- if they are not ----->> send a respnse back (sorry I don't have time for you) .....(for now)
+4- suppose there were a running task --->> when a new one arrives --->> 1- stop the running task.
+										  2- 
+
+check for the entered time not less that current time.
+after removing task , update free slots.
