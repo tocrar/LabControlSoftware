@@ -31,15 +31,6 @@ class Shuttle:
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.__TransportTime = transportTime
-		self.__machine_1_StartTime = 0
-		self.__machine_1_EndTime = 0
-		self.__machine_2_StartTime = 0
-		self.__machine_2_EndTime = 0
-		self.__machine_3_StartTime = 0
-		self.__machine_3_EndTime = 0
-		self.__machine_4_StartTime = 0
-		self.__machine_4_EndTime = 0
-		self.__machine_123_DeadLine = 0 
 		self.__got_machine_4_response = False
 		self.Type = "shuttle"
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
@@ -108,6 +99,21 @@ class Shuttle:
 		
 	def got_machine_4_response(self):
 		return self.__got_machine_4_response 
+
+	def get_machine_4_min_start_time(self):
+		tempTime = 0
+		for machine in self.__machines:
+			if machine != 'machine_4':
+				tempTime = tempTime +  int(self.__machines[machine]._RequiredProcessingTime)  
+
+		temStr = str(tempTime)
+		dif = 3 - len(temStr)
+		temZero = ''
+		for i in range(dif):
+			temZero  = temZero + str(0)
+		temStr = temZero + temStr 
+		print "temStr: ", temStr
+		return temStr
 		
 	def get_machine_4_response(self,message):
 		if(message['sendername'] == 'machine_4'):
@@ -123,12 +129,14 @@ class Shuttle:
 				if machine != 'machine_4':
 					self.__machines[machine]._DeadLine = tempStartTime - self.__TransportTime
 					print('%s deadline is  %d:%d'%(machine,self.__machines[machine]._DeadLine/3600,(self.__machines[machine]._DeadLine%3600)/60))
-			self.sed_machine_1_2_3_request()
+			self.send_machine_1_2_3_request()
 
-	def sed_machine_1_2_3_request(self):
+	def send_machine_1_2_3_request(self):
 		for machine in self.__machines:
 			if machine != 'machine_4':
 				msg = str(self.ContractNumber)+str(self.Priority)+str(self.get_machine_processing_time(machine))+str(self.__machines[machine]._DeadLine)
+				print("msg , %s: "% self.send_machine_1_2_3_request.__name__)
+				print msg
 				self.sendMessageFunc('TCP',machine,'','ADD', msg)			
 
 	def get_EDF_response(self,message):
@@ -137,10 +145,16 @@ class Shuttle:
 		tempStartTime = int(timeList[0])
 		tempFinishTime = int(timeList[1])
 		if(message['sendername'] == 'machine_1'):
+			self.__machines['machine_1']._StartTime = tempStartTime
+			self.__machines['machine_1']._EndTime = tempFinishTime
 			print('I got my time slot on machine_1 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
 		elif(message['sendername'] == 'machine_2'):
+			self.__machines['machine_2']._StartTime = tempStartTime
+			self.__machines['machine_2']._EndTime = tempFinishTime
 			print('I got my time slot on machine_2 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
 		elif(message['sendername'] == 'machine_3'):
+			self.__machines['machine_3']._StartTime = tempStartTime
+			self.__machines['machine_3']._EndTime = tempFinishTime
 			print('I got my time slot on machine_3 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
 
 
@@ -204,7 +218,9 @@ def main():
 		myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
 		myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
 		if(myShuttle.has_machine('machine_4')):
-			msg =  str(myShuttle.ContractNumber)  + str(myShuttle.Priority) + str(myShuttle.get_machine_processing_time('machine_4'))+ str(myShuttle.EndTime)
+			print "machin_4 min start time :",myShuttle.get_machine_4_min_start_time()
+			msg =  str(myShuttle.ContractNumber)+str(myShuttle.Priority)+str(myShuttle.get_machine_processing_time('machine_4'))+str(myShuttle.EndTime)+myShuttle.get_machine_4_min_start_time()
+			print "message: ", msg
 			myShuttle.sendMessageFunc('TCP','machine_4','','ADD', msg)
 		# messages ={}
 		# for k in myShuttle.machines:

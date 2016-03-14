@@ -1,6 +1,6 @@
 
 class queueElement:
-	def __init__(self,Priority,EndTime,ProcessingTime,name,ContractNum):
+	def __init__(self,Priority,EndTime,ProcessingTime,name,ContractNum,minStarTime):
 		print "task consructor......."
 		self._Name = name
 		self._ProcessingTime = ProcessingTime
@@ -11,7 +11,7 @@ class queueElement:
 		self._processingStatus = False	# not done
 		self._ProcessingRmainingTime = ProcessingTime
 		self._StartTime = 0
-		self._MinStartTime = 0
+		self._MinStartTime = minStarTime
 		self._TempStartTime = 0
 		self._WorstCaseFinishingTime = EndTime
 		self._TempWorstCaseFinishingTime = 0

@@ -25,8 +25,7 @@ class MachineScheduler():
 	def __init__(self,trnsportTime,addHandler,sendMessage,shutdown):
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
-		self.shutdown = shutdown
-		self.__newTaskArrived = False 
+		self.shutdown = shutdown 
 		self.__scheduleFail = False
 		self.__newTask = {}
 		self.__taskDic={}
@@ -82,11 +81,11 @@ class MachineScheduler():
 	def __addNewTask(self):
 		tempdic = {}
 		key = self.__newTask.keys()
+		minimumStartTime = 0
 		print key[0]
 		tempdic[key[0]] = self.__newTask[key[0]]
-		self.__taskDic[key[0]] = queueElement(tempdic[key[0]]['priority'],tempdic[key[0]]['endTime'],tempdic[key[0]]['processingTime'],key[0],tempdic[key[0]]['ContractNumber'])
+		self.__taskDic[key[0]] = queueElement(tempdic[key[0]]['priority'],tempdic[key[0]]['endTime'],tempdic[key[0]]['processingTime'],key[0],tempdic[key[0]]['ContractNumber'],minimumStartTime)
 		print "task added to self.__dic :",self.__taskDic
-		self.__newTaskArrived = True
 		self.__newTask.clear()
 		tempdic.clear()
 		return True
@@ -141,10 +140,10 @@ class MachineScheduler():
 		firstelement = (sortdtasks[0][0])
 		if hasattr(tempRunningTask,'_EndTime'):
 			#set running task end time as the start time for first task
-			self.__taskDic[firstelement]._TempStartTime = tempRunningTask._WorstCaseFinishingTime + (self.__transportationTime * 60)
+			self.__taskDic[firstelement]._TempStartTime = tempRunningTask._WorstCaseFinishingTime + (self.__transportationTime)
 			print ("self.__taskDic[firstelement]._TempStartTime  %d:%d "%(self.__taskDic[firstelement]._TempStartTime/3600,(self.__taskDic[firstelement]._TempStartTime%3600)/60))
 		else:
-			self.__taskDic[firstelement]._TempStartTime = currenttimeinseconds + (self.__transportationTime * 60)
+			self.__taskDic[firstelement]._TempStartTime = currenttimeinseconds + (self.__transportationTime)
 			print ("self.__taskDic[firstelement]._TempStartTime  %d:%d "%(self.__taskDic[firstelement]._TempStartTime/3600,(self.__taskDic[firstelement]._TempStartTime%3600)/60))
 
 		self.__taskDic[firstelement]._TempWorstCaseFinishingTime =  self.__taskDic[firstelement]._TempStartTime + self.__taskDic[firstelement]._ProcessingRmainingTime
@@ -152,7 +151,7 @@ class MachineScheduler():
 		for i in range(1,len(self.__taskDic)):
 			currenttask = self.__taskDic[(sortdtasks[i][0])]
 			lasttask = self.__taskDic[(sortdtasks[i-1][0])]
-			currenttask._TempStartTime = lasttask._TempWorstCaseFinishingTime + (self.__transportationTime *60)
+			currenttask._TempStartTime = lasttask._TempWorstCaseFinishingTime + (self.__transportationTime)
 			currenttask._TempWorstCaseFinishingTime = currenttask._TempStartTime + currenttask._ProcessingRmainingTime 
 			
 		# compare worst case finishing time with end time for each task
@@ -187,10 +186,9 @@ class MachineScheduler():
 		taskNum = int(tempint[0])  # should be passed to the machine while the start time comes 
 		priority = int(tempint[1])
 		processingTime =int(tempint[2]+tempint[3]+tempint[4]) * 60 # converted to seconds
-		endTime = tempint[5]+tempint[6]+tempint[7]+tempint[8]
+		endTime = int(tempint[5]+tempint[6]+tempint[7]+tempint[8]) # already in seconds 
 		self.__newTask[message['sendername']]= {'priority':priority,'processingTime':processingTime,'endTime':endTime,'ContractNumber':taskNum}
-		self.__newTask[message['sendername']]['endTime']=self.__converttoseconds(self.__newTask[message['sendername']]['endTime'])
-		self.__newTaskArrived = True
+		#self.__newTask[message['sendername']]['endTime']=self.__converttoseconds(self.__newTask[message['sendername']]['endTime'])
 		taskAdded = self.__addNewTask() # create new task object and add it to the the task queue of the machine 
 		print "taskAdded: ",taskAdded
 		taskScheduled = self.__scheduleTasks() #tasks scheduleability test according to EDF 
@@ -204,6 +202,7 @@ class MachineScheduler():
 			del self.__taskDic[message['sendername']]
 			response = 'No time for you ,try again later '
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULEFAIL', response)
+		self.print_elements_queue()
 		
 
 
@@ -219,7 +218,7 @@ def main():
 		sys.exit()
 	router_ip = sys.argv[1]
 	name = sys.argv[2]
-	trnasportTime = 1 # in minutes
+	trnasportTime = 1 * 60 # in seconds
 	Type = "machine"
 	print "router ip is : ",router_ip
 	myInterface = P2P_Interface(shutdown,name,Type,router_ip)
