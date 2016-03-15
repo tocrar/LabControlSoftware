@@ -30,7 +30,7 @@ class Machine():
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.shutdown = shutdown
-		print "child koko ....."
+		print "current time :",  datetime.datetime.now()
 		self.__scheduleFail = False
 		self.__scheduleSuccess = False
 		self.__freeTimeSlots = 0 
@@ -63,7 +63,7 @@ class Machine():
 					print "task started ",value._Name
 					print "contract number: ", value._ContractNumber
 					#self.__gpioInterface.outputval(value._ContractNumber) # works only for beagle bone
-					t=Timer(value._ProcessingTime,self.timeout,[value._Name]) # argument has to passed as an array 
+					t=Timer(value._ProcessingTime,self.timeout,[value._Name]) # argument has to be passed as an array 
 					t.start() 
 					print "Timer started"
 					
@@ -90,9 +90,12 @@ class Machine():
 ####################################################
 	#handler to cancel task scheduling and remove it from the task queue of the machine 
 	def removeTask(self,msg):
-		print "Removing..... ",self.__taskDic[msg['sendername']]._Name
-		del self.__taskDic[msg['sendername']]
-		print "Task removed ......" 
+		if msg['sendername'] in self.__taskDic:
+			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
+			del self.__taskDic[msg['sendername']]
+			print "Task removed ......" 
+		else:
+			print ("%s: you are trying to remove a non existing task"% self.removeTask.__name__)
 
 ####################################################
 	def __converttoseconds(self,strtime):
@@ -146,12 +149,12 @@ class Machine():
 
 		if(not self.__scheduleSuccess):
 			del self.__taskDic[message['sendername']]
-			response = 'No time for you ,try again later '
+			response = '00'
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULEFAILM4', response)
 		self.__scheduleFail = False
 		print "End of task arrived ................."
 		self.print_elements_queue()
-		print "===================================================================================================\n"
+		print "=====================================================================================================================\n"
 		self.printSlots()
 		return True
 		
@@ -233,10 +236,22 @@ class Machine():
 							tempFinishTime = self.__taskDic[self.__FreeSlots[i].getNextTask()]._StartTime - self.__transportationTime
 							if (tempFinishTime <self.__taskDic[name]._EndTime):
 								self.__taskDic[name]._WorstCaseFinishingTime = tempFinishTime
+								self.__taskDic[name]._StartTime = self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[name]._ProcessingTime
+								self.__taskDic[name]._DeadlineForRelatedTasks = self.__taskDic[name]._StartTime - self.__transportationTime
+								self.__taskDic[name]._Status ="Scheduled" 
+								print("time slot num %d is suitalbe for the task "%(i))
+								return True
 							else : 
 								self.__taskDic[name]._WorstCaseFinishingTime = self.__taskDic[name]._EndTime
 								# need to handle if there is no pervious tasks 
-								if((self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[self.__FreeSlots[i].getPreviousTask()]._EndTime) >= (self.__taskDic[name]._ProcessingTime+self.__transportationTime)):
+								if((self.__FreeSlots[i].getPreviousTask() == '') and (self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[name]._MinStartTime) >= (self.__taskDic[name]._ProcessingTime+self.__transportationTime)): # no previous tasks 
+									self.__taskDic[name]._StartTime = self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[name]._ProcessingTime
+									self.__taskDic[name]._DeadlineForRelatedTasks = self.__taskDic[name]._StartTime - self.__transportationTime
+									self.__taskDic[name]._Status ="Scheduled" 
+									print("time slot num %d is suitalbe for the task "%(i))
+									return True
+
+								elif((self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[self.__FreeSlots[i].getPreviousTask()]._EndTime) >= (self.__taskDic[name]._ProcessingTime+self.__transportationTime)):
 									self.__taskDic[name]._StartTime = self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[name]._ProcessingTime
 									self.__taskDic[name]._DeadlineForRelatedTasks = self.__taskDic[name]._StartTime - self.__transportationTime
 									self.__taskDic[name]._Status ="Scheduled" 
@@ -246,12 +261,6 @@ class Machine():
 									print("time slot num %d is not suitalbe for the task form inner if condition  "%(i))
 									break 
 								
-
-								self.__taskDic[name]._StartTime = self.__taskDic[name]._WorstCaseFinishingTime - self.__taskDic[name]._ProcessingTime
-								self.__taskDic[name]._DeadlineForRelatedTasks = self.__taskDic[name]._StartTime - self.__transportationTime
-								self.__taskDic[name]._Status ="Scheduled" 
-								print("time slot num %d is suitalbe for the task "%(i))
-								return True
 
 						else:
 							print("time slot num %d is not suitalbe for the task "%(i))
@@ -360,7 +369,7 @@ def main():
 			sys.exit()
 		router_ip = sys.argv[1]
 		name = sys.argv[2]
-		trnasTime = 1 * 60 # in seconds 
+		trnasTime = 5 * 60 # in seconds 
 		Type = "machine"
 		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)

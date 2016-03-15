@@ -4,6 +4,7 @@ import signal
 import os
 from subprocess import call
 import datetime
+from threading import Timer
 
 sys.path.append('../common')
 import machine_task
@@ -27,6 +28,7 @@ class Shuttle:
 
 	def __init__(self,shutdown,Priority,EndTime,MachinesList,addHandler,sendMessage,transportTime):
 		print "initializing shuttle ........"
+		print "current time :",  datetime.datetime.now()
 		self.shutdown = shutdown
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
@@ -76,7 +78,11 @@ class Shuttle:
 
 
 	def schedule_fail(self,message):
-		print message['data']
+		if message['sendername'] in self.__machines:
+			self.__machines[message['sendername']]._ScheduleSuccess = False
+			print("schedule on %s fail "%(message['sendername']))
+		else:
+			print("%s: this sender is not in my machine tasks"% self.schedule_fail.__name__)
 
 	def has_machine(self,machine_name):
 		if type(machine_name) != type('text') :
@@ -86,6 +92,12 @@ class Shuttle:
 			return True
 		else:
 			return False
+
+	def get_required_machines_list(self):
+		machineslist = []
+		for machine in self.__machines:
+			machineslist.append(machine)
+		return machineslist
 
 	def get_machine_processing_time(self,machine_name):
 		if type(machine_name) != type('text') :
@@ -105,7 +117,6 @@ class Shuttle:
 		for machine in self.__machines:
 			if machine != 'machine_4':
 				tempTime = tempTime +  int(self.__machines[machine]._RequiredProcessingTime)  
-
 		temStr = str(tempTime)
 		dif = 3 - len(temStr)
 		temZero = ''
@@ -114,6 +125,18 @@ class Shuttle:
 		temStr = temZero + temStr 
 		print "temStr: ", temStr
 		return temStr
+
+	def __check_ScheduleSuccess_123(self):
+		print self.__check_ScheduleSuccess_123.__name__
+		tempSuccess = True
+		for machine in self.__machines:
+			if machine != 'machine_4':
+				tempSuccess = tempSuccess and self.__machines[machine]._ScheduleSuccess
+		print"temp Success: ",tempSuccess
+		if tempSuccess:
+			print "success for all machines , I should send confimation message"
+		else:
+			print "schedule fails by one of the machines , I should send cancel request"
 		
 	def get_machine_4_response(self,message):
 		if(message['sendername'] == 'machine_4'):
@@ -122,6 +145,8 @@ class Shuttle:
 			tempFinishTime = int(timeList[1])
 			print('I got my time slot on machine_4 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
 			self.__got_machine_4_response = True
+			t=Timer(20,self.__check_ScheduleSuccess_123) # check to send confirmation message for the machines with the time slots 
+			t.start() 
 			self.__machines['machine_4']._StartTime = tempStartTime
 			self.__machines['machine_4']._EndTime  = tempFinishTime
 			self.__machines['machine_4']._DeadLine = tempFinishTime
@@ -130,6 +155,8 @@ class Shuttle:
 					self.__machines[machine]._DeadLine = tempStartTime - self.__TransportTime
 					print('%s deadline is  %d:%d'%(machine,self.__machines[machine]._DeadLine/3600,(self.__machines[machine]._DeadLine%3600)/60))
 			self.send_machine_1_2_3_request()
+		else:
+			print("%s: the sender has sent 'SCHEDULEDM4' but the sender is not machine_4")
 
 	def send_machine_1_2_3_request(self):
 		for machine in self.__machines:
@@ -140,42 +167,21 @@ class Shuttle:
 				self.sendMessageFunc('TCP',machine,'','ADD', msg)			
 
 	def get_EDF_response(self,message):
-		#print message['sendername'],':',message['data']
-		timeList = message['data'].split()
-		tempStartTime = int(timeList[0])
-		tempFinishTime = int(timeList[1])
-		if(message['sendername'] == 'machine_1'):
-			self.__machines['machine_1']._StartTime = tempStartTime
-			self.__machines['machine_1']._EndTime = tempFinishTime
-			print('I got my time slot on machine_1 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
-		elif(message['sendername'] == 'machine_2'):
-			self.__machines['machine_2']._StartTime = tempStartTime
-			self.__machines['machine_2']._EndTime = tempFinishTime
-			print('I got my time slot on machine_2 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
-		elif(message['sendername'] == 'machine_3'):
-			self.__machines['machine_3']._StartTime = tempStartTime
-			self.__machines['machine_3']._EndTime = tempFinishTime
-			print('I got my time slot on machine_3 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
-
+		if message['sendername'] in self.__machines:
+			timeList = message['data'].split()
+			tempStartTime = int(timeList[0])
+			tempFinishTime = int(timeList[1])
+			self.__machines[message['sendername']]._StartTime = tempStartTime
+			self.__machines[message['sendername']]._EndTime = tempFinishTime
+			self.__machines[message['sendername']]._ScheduleSuccess = True
+			print('I got my time slot on %s from %d:%d ,to %d:%d'%(message['sendername'],tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
+		else:
+			print("%s: the sender has sent a 'SCHEDULED' but the sender is not in my machine tasks")
 
 # user defined method to print the data of a received message
 	def print_message( self,message ):
 		print message['sendername'], ':', message['data']
     
-
-	#user defined function 
-	def request_message(self,message):
-		print message['sendername'],"sent request number",message['data']
-		tmpmsg = message['data']
-		print "koko toto",type(tmpmsg)
-		tempint = list(tmpmsg)
-		print tempint
-		contractNum =int(tempint[0])
-		priority =int(tempint[1])
-		processTime =int(tempint[2]+tempint[3]+tempint[4])
-		#endTime = int(tempint[5]+tempint[6]+tempint[7]+tempint[8])
-		endTime = tempint[5]+tempint[6]+tempint[7]+tempint[8]
-		print "cotract number =",contractNum  , " ,priority = ",priority,", processTime =",processTime," ,endTime =",endTime
 	
 	# user defined method to print the address book
 	def print_address_book( self,address_book ):
@@ -205,13 +211,12 @@ def main():
 		EndTime= 1230
 		shutdown = [False]
 		Type = "shuttle"
-		transportTime = 1 * 60 # in seconds 
+		transportTime = 5 * 60 # in seconds 
 		MachinesList =4
 		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
 		 
 		myShuttle = Shuttle(shutdown,Priority,EndTime,MachinesList,myInterface.add_handler,myInterface.sendmessage,transportTime)
-		myShuttle.addHandlerFunc('REQUEST',myShuttle.request_message)
 		myShuttle.addHandlerFunc('PRINT', myShuttle.print_message)
 		myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
 		myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
@@ -270,7 +275,9 @@ def main():
 				myShuttle.sendMessageFunc('TCP', recvname,'','ADD', data)
 
 			elif input_text.startswith('CANCEL'):
-				myShuttle.sendMessageFunc('TCP','machine_1','','CANCEL','hello')
+				machineslist = myShuttle.get_required_machines_list()
+				for machine in machineslist:
+					myShuttle.sendMessageFunc('TCP',machine,'','CANCEL','hello')
 
 			elif input_text.startswith('TIME'):
 				print "current time: ",datetime.datetime.now()

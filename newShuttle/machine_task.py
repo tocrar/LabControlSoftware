@@ -17,6 +17,7 @@ class TaskForMachine:
 		self._StartTime = 0
 		self._EndTime = 0
 		self._DeadLine = 0 
+		self._ScheduleSuccess = False
 		#self._ContractNumber = ContractNumber
 		print ("Required processing time  : %s , priority: %s , procssing status : %s , processing left time : %s"  %(self._RequiredProcessingTime ,  self._Priority ,self._processingStatus,self._ProcessingLeftTime))
 		print "initializing machine task done ........"

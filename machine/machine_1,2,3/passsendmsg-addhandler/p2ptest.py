@@ -29,6 +29,7 @@ class MachineScheduler():
 		self.__scheduleFail = False
 		self.__newTask = {}
 		self.__taskDic={}
+		print "current time :",  datetime.datetime.now()
 		#self.__gpioInterface = gpio_Interface()
 		#self.__gpioInterface.clearpins()# works only for beagle bone 
 		self.__transportationTime = trnsportTime # works only for beagle bone 
@@ -92,10 +93,13 @@ class MachineScheduler():
 
 ####################################################
 	#handler to cancel task scheduling and remove it from the task queue of the machine 
-	def removeTask(self,msg): # cannot make it private because it is called outside the class in addhandler
-		print "Removing..... ",self.__taskDic[msg['sendername']]._Name
-		del self.__taskDic[msg['sendername']]
-		print "Task canceld ......" 
+	def removeTask(self,msg):
+		if msg['sendername'] in self.__taskDic:
+			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
+			del self.__taskDic[msg['sendername']]
+			print "Task removed ......" 
+		else:
+			print ("%s: you are trying to remove a not existing task"% self.removeTask.__name__)
  
 ####################################################
 	def __converttoseconds(self,strtime):
@@ -186,7 +190,10 @@ class MachineScheduler():
 		taskNum = int(tempint[0])  # should be passed to the machine while the start time comes 
 		priority = int(tempint[1])
 		processingTime =int(tempint[2]+tempint[3]+tempint[4]) * 60 # converted to seconds
-		endTime = int(tempint[5]+tempint[6]+tempint[7]+tempint[8]) # already in seconds 
+		if(len(tempint) == 9):
+			endTime = int(tempint[5]+tempint[6]+tempint[7]+tempint[8]) # already in seconds
+		else:
+		  endTime = int(tempint[5]+tempint[6]+tempint[7]+tempint[8]+tempint[9]) # already in seconds
 		self.__newTask[message['sendername']]= {'priority':priority,'processingTime':processingTime,'endTime':endTime,'ContractNumber':taskNum}
 		#self.__newTask[message['sendername']]['endTime']=self.__converttoseconds(self.__newTask[message['sendername']]['endTime'])
 		taskAdded = self.__addNewTask() # create new task object and add it to the the task queue of the machine 
@@ -200,7 +207,7 @@ class MachineScheduler():
 		#test fails
 		if(not taskScheduled):
 			del self.__taskDic[message['sendername']]
-			response = 'No time for you ,try again later '
+			response = '00'
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULEFAIL', response)
 		self.print_elements_queue()
 		
@@ -218,7 +225,7 @@ def main():
 		sys.exit()
 	router_ip = sys.argv[1]
 	name = sys.argv[2]
-	trnasportTime = 1 * 60 # in seconds
+	trnasportTime = 5 * 60 # in seconds
 	Type = "machine"
 	print "router ip is : ",router_ip
 	myInterface = P2P_Interface(shutdown,name,Type,router_ip)

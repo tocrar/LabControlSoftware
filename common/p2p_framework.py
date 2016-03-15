@@ -127,7 +127,7 @@ class P2P_Interface:
 		# The thread 't_address_book' runs an instance of the method 
 		# '__update_address_book()' which continuously updates the address book
 		t_address_book = threading.Thread( target = self.__update_address_book,
-										 args=[6,6])
+										 args=[6,12])
 		t_address_book.start()
 		
 		
