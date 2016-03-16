@@ -71,7 +71,7 @@ class sqldb():
 			except:
 				return False
 				
-	def request(self, sql, curtype="dict", desc=False):
+	def sqlquery(self, sql, curtype="dict", desc=False):
 		with self.rlock:
 				if sql[0:6] == "SELECT" and desc==False:
 					return self.select(sql, curtype)
