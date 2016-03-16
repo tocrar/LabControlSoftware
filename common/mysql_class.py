@@ -6,7 +6,15 @@
 import MySQLdb
 import threading
 
-
+#---------------------------------------------------------------------------------------------
+'''
+this class uses the MySQLdb library.
+You can get it on linux with:
+sudo apt-get install python-mysqldb
+Other source is (untested):
+https://github.com/farcepest/MySQLdb1
+'''
+#---------------------------------------------------------------------------------------------
 class sqldb():
 
 	def __init__(self,host,user,passwd,db):
@@ -63,10 +71,13 @@ class sqldb():
 			except:
 				return False
 				
-	def request(self, sql, curtype="dict"):
+	def request(self, sql, curtype="dict", desc=False):
 		with self.rlock:
-				if sql[0:6] == "SELECT":
+				if sql[0:6] == "SELECT" and desc==False:
 					return self.select(sql, curtype)
+					
+				elif sql[0:6] == "SELECT" and desc==True:
+					return self.select_desc(sql, curtype)
 					
 				elif sql[0:6] == "UPDATE" or sql[0:6] == "INSERT":
 					tmp = self.update(sql)
