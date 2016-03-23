@@ -6,10 +6,9 @@ class TaskForMachine:
 """
 
 
-	def __init__(self,MachineNumber,RequiredProcessingTime,Priority):
-	
-		print ("initializing machine %s task statrted ........"% MachineNumber)
-		self._MachineNumber= MachineNumber
+	def __init__(self,name,RequiredProcessingTime,Priority):
+		print "initializing ",name 
+		self._Name = name
 		self._RequiredProcessingTime= RequiredProcessingTime
 		self._Priority = Priority
 		self._processingStatus = False	# not done

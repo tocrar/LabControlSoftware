@@ -74,7 +74,7 @@ class Machine():
 		#self.__gpioInterface.clearpins() # works only for beagle bone
 		msg={}
 		msg['sendername']= name
-		self.removeTask(msg)
+		self.__removeTask(msg)
 
 	def __del__(self):
 		print "machine destructor......"
@@ -88,14 +88,21 @@ class Machine():
 
 
 ####################################################
-	#handler to cancel task scheduling and remove it from the task queue of the machine 
-	def removeTask(self,msg):
+	
+	def __removeTask(self,msg):
 		if msg['sendername'] in self.__taskDic:
 			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
 			del self.__taskDic[msg['sendername']]
 			print "Task removed ......" 
 		else:
-			print ("%s: you are trying to remove a non existing task"% self.removeTask.__name__)
+			print ("%s: you are trying to remove a not existing task"% self.__removeTask.__name__)
+
+
+#handler to cancel task scheduling and remove it from the task queue of the machine 
+	def cancelRequest(self,msg):
+		print "I got cancel request from: ",msg['sendername']
+		self.__removeTask(msg)
+ 
 
 ####################################################
 	def __converttoseconds(self,strtime):
@@ -369,7 +376,7 @@ def main():
 			sys.exit()
 		router_ip = sys.argv[1]
 		name = sys.argv[2]
-		trnasTime = 5 * 60 # in seconds 
+		trnasTime = 2 * 60 # in seconds 
 		Type = "machine"
 		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
@@ -377,7 +384,7 @@ def main():
 	 	myInterface.display_message_list() 
 		status = myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
 		print "status from main", status
-		myScheduler.addHandlerFunc('CANCEL', myScheduler.removeTask)
+		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
 
 		t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
 		t_handleTasks.start()

@@ -5,6 +5,7 @@ import os
 from subprocess import call
 import datetime
 from threading import Timer
+import operator
 
 sys.path.append('../common')
 import machine_task
@@ -26,49 +27,35 @@ def print_address_book( address_book ):
 
 class Shuttle:
 
-	def __init__(self,shutdown,Priority,EndTime,MachinesList,addHandler,sendMessage,transportTime):
+	def __init__(self,shutdown,Priority,EndTime,MachinesDic,machine4,addHandler,sendMessage,address_book,transportTime):
 		print "initializing shuttle ........"
 		print "current time :",  datetime.datetime.now()
 		self.shutdown = shutdown
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
+		self.__getAddressBookFunc = address_book   # list is given as a list of tuples (name, type): [['Alice', 'shuttle'],['Bob', 'machine']
 		self.__TransportTime = transportTime
 		self.__got_machine_4_response = False
 		self.Type = "shuttle"
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
 		print "pid is : ",os.getpid()
-		print ("please enter the contract Priority" )
-		self.Priority = raw_input('>>>')
-		self.Priority = int(self.Priority)
-
+		self.Priority = Priority
 		print ("please enter the contract Number" )
 		self.ContractNumber = raw_input('>>>')
 		self.ContractNumber = int(self.ContractNumber)
-		
-		print ("please enter the expected End Time in the form <02:30>")
-		self.EndTime = raw_input('>>>')
+		self.EndTime = EndTime
 		self.EndTime = self.EndTime.split(":")
-		print "end time :", self.EndTime
 		self.EndTime = (''.join(self.EndTime))
-		print "end time :", self.EndTime , type(self.EndTime)
-		print "length of end time : ",len(self.EndTime)
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
 		self.__machines ={}
 		# getting tasks information 
-		print "Enter tasks information "
-		print ("please enter the list of machines in the order in which the workpiece should be proccesd as in address book ")
-		input_text = raw_input('>>>')
-		print input_text
-		MachinesList = input_text.split(",")
-		print "MachinesList : " , MachinesList
-		for task in MachinesList:	
-			print ("please enter processing time for machine %s in the form of minutes <020>:"% task)
-			RequiredProcessingTime = raw_input('>>>')
-			RequiredProcessingTime = RequiredProcessingTime
-
-			#print RequiredProcessingTime ,type(RequiredProcessingTime)
-			self.__machines[task] = machine_task.TaskForMachine(task,RequiredProcessingTime,self.Priority)
+		self.__machine_4 = machine_task.TaskForMachine(machine4['Name'],machine4['ProcessingTime'],self.Priority)
+		for task in MachinesDic:
+			print "task : ",task 
+			self.__machines[task] = machine_task.TaskForMachine(MachinesDic[task]['Name'],MachinesDic[task]['ProcessingTime'],self.Priority)
 		print "initializing shuttle done "
+		msg =  str(self.ContractNumber)+str(self.Priority)+str(machine4['ProcessingTime'])+str(self.EndTime)+self.get_machine_4_min_start_time()
+		self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
 
 
 	def kill_signal_handler(self,signal,frame):
@@ -130,28 +117,49 @@ class Shuttle:
 		print self.__check_ScheduleSuccess_123.__name__
 		tempSuccess = True
 		for machine in self.__machines:
-			if machine != 'machine_4':
+			if machine != self.__machine_4._Name:
 				tempSuccess = tempSuccess and self.__machines[machine]._ScheduleSuccess
 		print"temp Success: ",tempSuccess
-		if tempSuccess:
-			print "success for all machines , I should send confimation message"
+		if tempSuccess and self.__check_pickup_time():
+			print "success for all machines , and pickup time ,sending confirmation.........."
+			msg = 'confirm'
+			for machine in self.__machines:
+				self.sendMessageFunc('TCP',machine,'','CONFIRM', msg)
 		else:
-			print "schedule fails by one of the machines , I should send cancel request"
+			print "schedule fails by one of the machines ,or pickup time ,sending cancel request........"
+			msg = 'cancel'
+			for machine in self.__machines:
+				self.sendMessageFunc('TCP',machine,'','CANCEL', msg)
 		
+	def __check_pickup_time(self):
+		tasksEndTime ={}
+		for key,value in self.__machines.iteritems():
+			tasksEndTime[key] =value._EndTime 
+		sortdtasks = sorted(tasksEndTime.items(),key=operator.itemgetter(1))
+		print "sorted tasks: ",sortdtasks
+		for i in range(len(sortdtasks)-1):
+			if self.__machines[sortdtasks[i][0]]._EndTime + self.__TransportTime <= self.__machines[sortdtasks[i+1][0]]._EndTime :
+				print "yes greater for i: ",i
+				check = True
+			else:
+				check = False
+				return check
+		return check
+
 	def get_machine_4_response(self,message):
-		if(message['sendername'] == 'machine_4'):
+		if(message['sendername'] == self.__machine_4._Name):
 			timeList = message['data'].split()
 			tempStartTime = int(timeList[0])
 			tempFinishTime = int(timeList[1])
 			print('I got my time slot on machine_4 from %d:%d ,to %d:%d'%(tempStartTime/3600,(tempStartTime%3600)/60,tempFinishTime/3600,(tempFinishTime%3600)/60))
 			self.__got_machine_4_response = True
-			t=Timer(20,self.__check_ScheduleSuccess_123) # check to send confirmation message for the machines with the time slots 
+			t=Timer(4,self.__check_ScheduleSuccess_123) # check to send confirmation message for the machines with the time slots 
 			t.start() 
-			self.__machines['machine_4']._StartTime = tempStartTime
-			self.__machines['machine_4']._EndTime  = tempFinishTime
-			self.__machines['machine_4']._DeadLine = tempFinishTime
+			self.__machine_4._StartTime = tempStartTime
+			self.__machine_4._EndTime  = tempFinishTime
+			self.__machine_4._DeadLine = tempFinishTime
 			for machine in self.__machines:
-				if machine != 'machine_4':
+				if machine != self.__machine_4._Name:
 					self.__machines[machine]._DeadLine = tempStartTime - self.__TransportTime
 					print('%s deadline is  %d:%d'%(machine,self.__machines[machine]._DeadLine/3600,(self.__machines[machine]._DeadLine%3600)/60))
 			self.send_machine_1_2_3_request()
@@ -159,8 +167,17 @@ class Shuttle:
 			print("%s: the sender has sent 'SCHEDULEDM4' but the sender is not machine_4")
 
 	def send_machine_1_2_3_request(self):
-		for machine in self.__machines:
-			if machine != 'machine_4':
+		# need to check for the machine in address book befor sending messages
+		peers = self.__getAddressBookFunc()
+		peersList = []
+		for i in range(len(peers)):
+			peersList.append(peers[i][0])
+		print "address book: ", peersList
+		for agent in peers:
+			print"agent : ", agent   
+		for machine in self.__machines :
+			if machine != self.__machine_4._Name and machine in peersList:
+				print "machine in list ",machine
 				msg = str(self.ContractNumber)+str(self.Priority)+str(self.get_machine_processing_time(machine))+str(self.__machines[machine]._DeadLine)
 				print("msg , %s: "% self.send_machine_1_2_3_request.__name__)
 				print msg
@@ -208,42 +225,29 @@ def main():
 		name = sys.argv[2]
 		#ContractNumber= 1
 		Priority=2
-		EndTime= 1230
 		shutdown = [False]
 		Type = "shuttle"
-		transportTime = 5 * 60 # in seconds 
-		MachinesList =4
+		transportTime = 2 * 60 # in seconds 
+		Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'009'},\
+									'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
+									
+		machine4 = {'Name':'machine_4','ProcessingTime':'010'}
 		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
+		machines = {}
+		#machine4task = machine_task.TaskForMachine(machine4[Name],machine4[ProcessingTime],Priority)
+		print "Machines_dic : " , Machines_dic
+		#for task in Machines_dic:	
+			#machines[task] = machine_task.TaskForMachine(task,task[ProcessingTime],Priority)
+		print ("please enter the expected End Time in the form <02:30>")
+		EndTime = raw_input('>>>')
 		 
-		myShuttle = Shuttle(shutdown,Priority,EndTime,MachinesList,myInterface.add_handler,myInterface.sendmessage,transportTime)
+		myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,myInterface.add_handler,myInterface.sendmessage,myInterface.get_address_book,transportTime)
 		myShuttle.addHandlerFunc('PRINT', myShuttle.print_message)
 		myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
 		myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
 		myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
 		myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
-		if(myShuttle.has_machine('machine_4')):
-			print "machin_4 min start time :",myShuttle.get_machine_4_min_start_time()
-			msg =  str(myShuttle.ContractNumber)+str(myShuttle.Priority)+str(myShuttle.get_machine_processing_time('machine_4'))+str(myShuttle.EndTime)+myShuttle.get_machine_4_min_start_time()
-			print "message: ", msg
-			myShuttle.sendMessageFunc('TCP','machine_4','','ADD', msg)
-		# messages ={}
-		# for k in myShuttle.machines:
-		# 	print myShuttle.machines[k]
-		# 	messages[k] = str(myShuttle.ContractNumber) + str(myShuttle.Priority)+ str(myShuttle.machines[k].GetRequiredProcessingTime())+ str(myShuttle.EndTime)
-		# print "messages : ",messages
-		# address_book =myInterface.get_address_book()
-		# print "address book :" ,address_book[1][0]
-		# for element in enumerate(address_book):
-		# 	print"element is: ",element[1][0]
-		# 	if "mach" in  element[1][0]:
-		# 		print "found a machine..." , element
-		# 		print "message of messages[ address_book[1][0]] :",messages[element[1][0]]
-		# 		# send the message using the 'sendmessage()' method of the p2p object
-		# 		myShuttle.sendMessageFunc('TCP', element[1][0],'','ADD', messages[element[1][0]])
-
-
-
 
 		# use a infinite loop for the user prompting 
 		while not shutdown[0]:
