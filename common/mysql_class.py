@@ -58,20 +58,21 @@ class sqldb():
 
 	#---------------------------
 				
-	def select_desc(self,sql,curtype="dict"):
+	def select_all(self,sql,curtype="dict"):
 		with self.rlock:
 			try:
 				self.__open(curtype)
 				self.__cur.execute(sql)
 				rows = self.__cur.fetchall()
 				desc = self.__cur.description
+				rowcount = self.__cur.rowcount
 				self.__close()
-				return rows, desc
+				return {"rows":rows, "description":desc, "rowcount":rowcount}
 			except:
-				return False, False
-	
+				return False
+
 	#---------------------------
-	
+
 	def update(self,sql):
 		with self.rlock:
 			try:
@@ -82,23 +83,17 @@ class sqldb():
 				return True
 			except:
 				return False
-	
+
 	#---------------------------
-	
-	def sqlquery(self, sql, curtype="dict", desc=False):
+
+	def sqlquery(self, sql, curtype="dict"):
 		with self.rlock:
-				if sql[0:6] == "SELECT" and desc==False:
-					return self.select(sql, curtype)
-					
-				elif sql[0:6] == "SELECT" and desc==True:
-					return self.select_desc(sql, curtype)
+				if sql[0:6] == "SELECT":
+					return self.select_all(sql, curtype)
 					
 				elif sql[0:6] == "UPDATE" or sql[0:6] == "INSERT":
 					tmp = self.update(sql)
-					if tmp is True:
-						return True
-					else:
-						pass
+					return tmp
 
 #----------------------------------------------------------------------------------------------------------------
 '''
@@ -132,8 +127,8 @@ SELECT (result as list of dictionaries):
 		mydb = mysql_class.sqldb(host,user,passwd,db)
 
 		sql = "SELECT * FROM testtable'"
-		rows = mydb.sqlquery(sql)
-		for dict in row:
+		result = mydb.sqlquery(sql)
+		for dict in result["rows"]:
 			print dict["id"]
 			print dict
 		
@@ -175,8 +170,8 @@ SELECT (result as list of lists):
 		mydb = mysql_class.sqldb(host,user,passwd,db)
 
 		sql = "SELECT * FROM testtable'"
-		rows = mydb.sqlquery(sql, curtype="list")
-		for list in row:
+		result = mydb.sqlquery(sql, curtype="list")
+		for list in result["rows"]:
 			print list[0]
 			print list
 
