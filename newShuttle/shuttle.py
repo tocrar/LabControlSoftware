@@ -232,13 +232,9 @@ def main():
 									'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
 									
 		machine4 = {'Name':'machine_4','ProcessingTime':'010'}
-		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
 		machines = {}
-		#machine4task = machine_task.TaskForMachine(machine4[Name],machine4[ProcessingTime],Priority)
 		print "Machines_dic : " , Machines_dic
-		#for task in Machines_dic:	
-			#machines[task] = machine_task.TaskForMachine(task,task[ProcessingTime],Priority)
 		print ("please enter the expected End Time in the form <02:30>")
 		EndTime = raw_input('>>>')
 		 
