@@ -64,7 +64,10 @@ class sqldb():
 				self.__open(curtype)
 				self.__cur.execute(sql)
 				rows = self.__cur.fetchall()
-				desc = self.__cur.description
+				tmpdesc = self.__cur.description
+				desc = []
+				for x in tmpdesc:
+					desc.append(x[0])
 				rowcount = self.__cur.rowcount
 				self.__close()
 				return {"rows":rows, "description":desc, "rowcount":rowcount}
