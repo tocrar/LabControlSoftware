@@ -1,5 +1,4 @@
 
-import sys
 import signal 
 import os
 from subprocess import call
@@ -7,9 +6,9 @@ import datetime
 from threading import Timer
 import operator
 
-sys.path.append('../common')
-import machine_task
-from p2p_framework import P2P_Interface
+# sys.path.append('../common')
+# import machine_task
+# from p2p_framework import P2P_Interface
 
  
 
