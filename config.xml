@@ -4,15 +4,18 @@
 <configs>
    <common_configs>
       <router_ip>172.16.1.1</router_ip>
+       <transport_time>2</transport_time>
    </common_configs>
 
    <shuttle_configs>
       <type>shuttle</type>
       <name>shuttle_1</name>
-      <transport_time>2</transport_time>
    </shuttle_configs>
 
    <machine_configs>
+       <type>machine</type>
+      <name>machine_4</name>
+      <test>kk</test>
    </machine_configs>
 
 </configs>

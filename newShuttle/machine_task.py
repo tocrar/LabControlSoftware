@@ -7,7 +7,7 @@ class TaskForMachine:
 
 
 	def __init__(self,name,RequiredProcessingTime,Priority):
-		print "initializing ",name 
+		#print "initializing ",name 
 		self._Name = name
 		self._RequiredProcessingTime= RequiredProcessingTime
 		self._Priority = Priority
@@ -17,9 +17,11 @@ class TaskForMachine:
 		self._EndTime = 0
 		self._DeadLine = 0 
 		self._ScheduleSuccess = False
+		self._PickedUp = False 
+		self._TimeDifference = 0
 		#self._ContractNumber = ContractNumber
-		print ("Required processing time  : %s , priority: %s , procssing status : %s , processing left time : %s"  %(self._RequiredProcessingTime ,  self._Priority ,self._processingStatus,self._ProcessingLeftTime))
-		print "initializing machine task done ........"
+		#print ("Required processing time  : %s , priority: %s , procssing status : %s , processing left time : %s"  %(self._RequiredProcessingTime ,  self._Priority ,self._processingStatus,self._ProcessingLeftTime))
+		#print "initializing machine task done ........"
 
 
 	def GetMachineNumber(self):

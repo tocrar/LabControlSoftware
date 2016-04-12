@@ -1,10 +1,14 @@
-
+#--------------------------------- general includes ----------------------------------#
 import signal 
 import os
 from subprocess import call
 import datetime
 from threading import Timer
 import operator
+import datetime
+
+#-------------------------------- project includes ------------------------------------#
+import machine_task
 
 # sys.path.append('../common')
 # import machine_task
@@ -37,7 +41,6 @@ class Shuttle:
 		self.__got_machine_4_response = False
 		self.Type = "shuttle"
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
-		print "pid is : ",os.getpid()
 		self.Priority = Priority
 		print ("please enter the contract Number" )
 		self.ContractNumber = raw_input('>>>')
@@ -61,6 +64,11 @@ class Shuttle:
 		print "you pressed ctrl+c !!"
 		call(["kill","-9",str(os.getpid())])
 
+
+	def getCurrentTimeInSeconds(self):
+		currenttime = datetime.datetime.now()
+		currenttimeinseconds = ( currenttime.hour * 60 + currenttime.minute ) * 60
+		return currenttimeinseconds
 
 
 	def schedule_fail(self,message):
@@ -129,7 +137,7 @@ class Shuttle:
 			msg = 'cancel'
 			for machine in self.__machines:
 				self.sendMessageFunc('TCP',machine,'','CANCEL', msg)
-		
+	# still need to handle check pickup time 	
 	def __check_pickup_time(self):
 		tasksEndTime ={}
 		for key,value in self.__machines.iteritems():
@@ -143,7 +151,7 @@ class Shuttle:
 			else:
 				check = False
 				return check
-		return check
+		return True
 
 	def get_machine_4_response(self,message):
 		if(message['sendername'] == self.__machine_4._Name):
@@ -160,7 +168,7 @@ class Shuttle:
 			for machine in self.__machines:
 				if machine != self.__machine_4._Name:
 					self.__machines[machine]._DeadLine = tempStartTime - self.__TransportTime
-					print('%s deadline is  %d:%d'%(machine,self.__machines[machine]._DeadLine/3600,(self.__machines[machine]._DeadLine%3600)/60))
+					#print('%s deadline is  %d:%d'%(machine,self.__machines[machine]._DeadLine/3600,(self.__machines[machine]._DeadLine%3600)/60))
 			self.send_machine_1_2_3_request()
 		else:
 			print("%s: the sender has sent 'SCHEDULEDM4' but the sender is not machine_4")
@@ -171,15 +179,15 @@ class Shuttle:
 		peersList = []
 		for i in range(len(peers)):
 			peersList.append(peers[i][0])
-		print "address book: ", peersList
-		for agent in peers:
-			print"agent : ", agent   
+		# print "address book: ", peersList
+		# for agent in peers:
+		# 	print"agent : ", agent   
 		for machine in self.__machines :
 			if machine != self.__machine_4._Name and machine in peersList:
-				print "machine in list ",machine
+				#print "machine in list ",machine
 				msg = str(self.ContractNumber)+str(self.Priority)+str(self.get_machine_processing_time(machine))+str(self.__machines[machine]._DeadLine)
-				print("msg , %s: "% self.send_machine_1_2_3_request.__name__)
-				print msg
+				# print("msg , %s: "% self.send_machine_1_2_3_request.__name__)
+				# print msg
 				self.sendMessageFunc('TCP',machine,'','ADD', msg)			
 
 	def get_EDF_response(self,message):
@@ -210,83 +218,17 @@ class Shuttle:
 		print '###############################################################'
 
 
-	
-def main():
+	# return the next station to go to and the supposed time  
+	def get_target_list(self): 
+		tasksStartTime ={}
+		#put task name , start time in a separate dic. to sort them 
+		for key,value in self.__machines.iteritems():
+			tasksStartTime[key] =value._StartTime
 
-	try:
-		print "main statrted ....."
-		shutdown = [False]
-		if len(sys.argv) !=3:
-			print "error"
-			print"Usage : filename.py <router_ip> <send_name>"
-			sys.exit()
-		router_ip = sys.argv[1]
-		name = sys.argv[2]
-		#ContractNumber= 1
-		Priority=2
-		shutdown = [False]
-		Type = "shuttle"
-		transportTime = 2 * 60 # in seconds 
-		Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'009'},\
-									'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
-									
-		machine4 = {'Name':'machine_4','ProcessingTime':'010'}
-		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-		machines = {}
-		print "Machines_dic : " , Machines_dic
-		print ("please enter the expected End Time in the form <02:30>")
-		EndTime = raw_input('>>>')
-		 
-		myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,myInterface.add_handler,myInterface.sendmessage,myInterface.get_address_book,transportTime)
-		myShuttle.addHandlerFunc('PRINT', myShuttle.print_message)
-		myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
-		myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
-		myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
-		myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
-
-		# use a infinite loop for the user prompting 
-		while not shutdown[0]:
-	
-			# save the users input in a variable
-			input_text = raw_input('>>>')
-	
-			# if the user enters 'EXIT', the inifinte while-loop quits and the
-			# program can terminate
-			if input_text == 'EXIT':
-				shutdown[0] = True
-		
-			# if the user enters 'ADDR', the address book will be printed in the
-			# console
-			elif input_text == 'ADDR':
-				address_book = myInterface.get_address_book()
-				print_address_book(address_book)
-	
-			# the user can send message to other clients by entering:
-			# SEND <receiver name> <message data>
-			# e.g.: SEND Bob Hi Bob, how are you?
-			elif input_text.startswith('SEND'):
-				tmp = input_text.partition(' ')
-				tmp = tmp[2].partition(' ')
-				recvname = tmp[0]
-				data = tmp[2]
-		
-				# send the message using the 'sendmessage()' method of the p2p object
-				myShuttle.sendMessageFunc('TCP', recvname,'','ADD', data)
-
-			elif input_text.startswith('CANCEL'):
-				machineslist = myShuttle.get_required_machines_list()
-				for machine in machineslist:
-					myShuttle.sendMessageFunc('TCP',machine,'','CANCEL','hello')
-
-			elif input_text.startswith('TIME'):
-				print "current time: ",datetime.datetime.now()
-
-	except KeyboardInterrupt:
-		sys.exit()
-
-	
+		sortdtasks = sorted(tasksStartTime.items(),key=operator.itemgetter(1)) 
+		print "sorted tasks according to start time  " , sortdtasks
+		# it returns an ordered list of tuppled [('machine1',1),('machine2',2),('machine3',3)]
+		return sortdtasks 
 
 
 
-if __name__ == "__main__":
-	main()

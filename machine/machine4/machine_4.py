@@ -1,24 +1,22 @@
-from freeTimeSlots import FreeTimeSlot
 
+#--------------------------------- general includes ----------------------------------#
 import datetime
 import operator
 import sys  
 import signal 
 import os
-import time
-import threading 
+import time 
+import threading
 from threading import Timer
 from subprocess import call 
 from xml.dom.minidom import parse
 import xml.dom.minidom
+import xml.etree.ElementTree as ET
 
+#-------------------------------- project includes ------------------------------------#
 #sys.path.append("../../tests")
 #from gpiotest import gpio_Interface # works only for beagle bone 
-
-
-sys.path.append('../../common')
-from p2p_framework import P2P_Interface 
-
+from freeTimeSlots import FreeTimeSlot
 sys.path.append('../includes')
 import machine_queue
 from machine_queue import queueElement
@@ -32,7 +30,9 @@ class Machine():
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.shutdown = shutdown
-		print "current time :",  datetime.datetime.now()
+		self.__backup_file = 0 
+		self.__backup_file_lock = threading.Lock()
+		print "current time :"+ str(datetime.datetime.now()) + '\n'
 		self.__scheduleFail = False
 		self.__scheduleSuccess = False
 		self.__freeTimeSlots = 0 
@@ -45,7 +45,6 @@ class Machine():
 		self.__lastArrivingTask = ""
 		self.__transportationTime = trnsportTime
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
-		print "pid is : ",os.getpid()
 	
 	# handler will be executed when "Ctl+C" will be pressed 
 	def kill_signal_handler(self,signal,frame):
@@ -82,6 +81,42 @@ class Machine():
 
 	def __del__(self):
 		print "machine destructor......"
+
+
+	def update_backup_data(self):
+		print "update backup thread started ......"
+		while not self.shutdown[0]:
+			print "update backup called....."
+
+			self.__backup_file_lock.acquire()
+			self.__backup_file = ET.parse('backup_machine4.xml')	
+			root = self.__backup_file.getroot()	
+			currentTime = root.find('current_time')
+			currentTime.text = str(self.getCurrentTimeInSeconds()) 
+			queue = root.find('machine_queue')
+			for element in self.__taskDic:
+				temp_element = queue.find(element)
+				temp_Status = temp_element.find('Status')
+				temp_Status.text = str(self.__taskDic[element]._Status)
+				if self.__taskDic[element]._Status == 'Running':
+					self.__taskDic[element]._ProcessingRmainingTime = self.__taskDic[element]._EndTime - self.getCurrentTimeInSeconds()
+					#print "remaining processing time: ",self.__taskDic[element]._ProcessingRmainingTime
+
+				temp_EndTime = temp_element.find('EndTime')
+				temp_EndTime.text = str(self.__taskDic[element]._EndTime)
+				temp_Priority = temp_element.find('Priority')
+				temp_Priority.text = str(self.__taskDic[element]._Priority)
+				temp_ProcessingTime = temp_element.find('ProcessingTime')
+				temp_ProcessingTime.text = str(self.__taskDic[element]._ProcessingTime)
+				temp_ProcessingRmainingTime = temp_element.find('ProcessingRmainingTime')
+				temp_ProcessingRmainingTime.text = str(self.__taskDic[element]._ProcessingRmainingTime)
+
+				#print("%s End time %d:%d saved ...."% (element,self.__taskDic[element]._EndTime/3600,((self.__taskDic[element]._EndTime%3600)/60)))
+
+			self.__backup_file.write('backup_machine4.xml')
+			self.__backup_file_lock.release()
+			time.sleep(30)
+ 
 	
 	#show the shuttles in the machine queue 
 	def print_elements_queue(self):
@@ -97,6 +132,18 @@ class Machine():
 	def __removeTask(self,msg):
 		if msg['sendername'] in self.__taskDic:
 			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
+
+			#acquire lock before using xml file 
+			self.__backup_file_lock.acquire()
+			# remove task from the Backup file 
+			self.__backup_file = ET.parse('backup_machine4.xml')	
+			root = self.__backup_file.getroot()	
+			queue = root.find('machine_queue')
+			temp_task = queue.find(msg['sendername'])
+			queue.remove(temp_task)
+			self.__backup_file.write('backup_machine4.xml')
+			self.__backup_file_lock.release()
+			# remove task from tasks dictionary 
 			del self.__taskDic[msg['sendername']]
 			print "Task removed ......" 
 		else:
@@ -150,7 +197,18 @@ class Machine():
 		if (self.__scheduleSuccess):
 			#print("schedule for %s done,start time: %f, End Time: %f"%(self.__taskDic[message['sendername']]._Name,self.__taskDic[message['sendername']]._StartTime/3600.0,self.__taskDic[message['sendername']]._WorstCaseFinishingTime/3600.0))
 			response = str(self.__taskDic[message['sendername']]._StartTime) +' '+ str(self.__taskDic[message['sendername']]._WorstCaseFinishingTime)	
-			print "ContractNumber: ",(self.__taskDic[message['sendername']]._ContractNumber)		
+			print "ContractNumber: ",(self.__taskDic[message['sendername']]._ContractNumber)
+			# add new entry to xml backup file 
+			self.__backup_file = ET.parse('backup_machine4.xml')	
+			root = self.__backup_file.getroot()	
+			queue = root.find('machine_queue')
+			task_element = ET.SubElement(queue,message['sendername'])
+			ET.SubElement(task_element,'EndTime')
+			ET.SubElement(task_element,'Priority')
+			ET.SubElement(task_element,'ProcessingTime')
+			ET.SubElement(task_element,'ProcessingRmainingTime') 
+			ET.SubElement(task_element,'Status')
+			self.__backup_file.write('backup_machine4.xml')
 			#print response
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULEDM4', response)
 
@@ -362,57 +420,57 @@ class Machine():
 
 
 
-def main():
+# def main():
 
-	try:
-		# Open XML document using minidom parser
-		DOMTree = xml.dom.minidom.parse("../../config.xml")
-		config = DOMTree.documentElement
-		print os.getpid()
-		print "main statrted ....."
-		shutdown = [False]
-		if len(sys.argv) !=3:
-			print "error"
-			print"Usage : filename.py <router_ip> <send_name>"
-			sys.exit()
+# 	try:
+# 		# Open XML document using minidom parser
+# 		DOMTree = xml.dom.minidom.parse("../../config.xml")
+# 		config = DOMTree.documentElement
+# 		print os.getpid()
+# 		print "main statrted ....."
+# 		shutdown = [False]
+# 		if len(sys.argv) !=3:
+# 			print "error"
+# 			print"Usage : filename.py <router_ip> <send_name>"
+# 			sys.exit()
 
-		router_ip = config.getElementsByTagName("router_ip")[0]
-		router_ip = router_ip.childNodes[0].data
+# 		router_ip = config.getElementsByTagName("router_ip")[0]
+# 		router_ip = router_ip.childNodes[0].data
 
-		#router_ip = sys.argv[1]
-		name = sys.argv[2]
-		trnasTime = 2 * 60 # in seconds 
-		Type = "machine"
-		print "router ip is : ",router_ip
-		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-		myScheduler = Machine(trnasTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
-	 	myInterface.display_message_list() 
-		status = myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
-		print "status from main", status
-		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
+# 		#router_ip = sys.argv[1]
+# 		name = sys.argv[2]
+# 		trnasTime = 2 * 60 # in seconds 
+# 		Type = "machine"
+# 		print "router ip is : ",router_ip
+# 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
+# 		myScheduler = Machine(trnasTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
+# 	 	myInterface.display_message_list() 
+# 		status = myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
+# 		print "status from main", status
+# 		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
 
-		t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
-		t_handleTasks.start()
+# 		t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
+# 		t_handleTasks.start()
 
-		while not shutdown[0]:
-			# save the user's input in a variable
-			input_text = raw_input('>>>')
+# 		while not shutdown[0]:
+# 			# save the user's input in a variable
+# 			input_text = raw_input('>>>')
 	
-			#if the user enters 'EXIT', the inifinte while-loop quits and the
-		# program can terminate
-			if input_text == 'EXIT':
-				shutdown[0] = True
-				del myInterface
-			elif input_text == 'PRINTQUEUE':
-				myScheduler.print_elements_queue();
-			elif input_text == 'PRINTFREESLOTS':
-				myScheduler.printSlots()
-			elif input_text.startswith('TIME'):
-				print "current time: ",datetime.datetime.now()
-	except KeyboardInterrupt:
-		shutdown = [True]
-		sys.exit()
+# 			#if the user enters 'EXIT', the inifinte while-loop quits and the
+# 		# program can terminate
+# 			if input_text == 'EXIT':
+# 				shutdown[0] = True
+# 				del myInterface
+# 			elif input_text == 'PRINTQUEUE':
+# 				myScheduler.print_elements_queue();
+# 			elif input_text == 'PRINTFREESLOTS':
+# 				myScheduler.printSlots()
+# 			elif input_text.startswith('TIME'):
+# 				print "current time: ",datetime.datetime.now()
+# 	except KeyboardInterrupt:
+# 		shutdown = [True]
+# 		sys.exit()
 
 
-if __name__ == "__main__":
-	main()
+# if __name__ == "__main__":
+# 	main()

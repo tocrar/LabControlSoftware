@@ -1,12 +1,12 @@
-# Global Includes
+#--------------------------------- general includes ----------------------------------#
 from xml.dom.minidom import parse
 import xml.dom.minidom
 import sys
+import os
 import time
 
-#Project includes
+#-------------------------------- project includes ------------------------------------#
 sys.path.append('../common')
-import machine_task
 from p2p_framework import P2P_Interface
 from shuttle import Shuttle
 
@@ -15,9 +15,11 @@ from shuttle import Shuttle
 def main():
 
 	try:
+#------------------------------------ INITIALIZATIONS ----------------------------------# 
+		
 		print "main statrted ....."
+				print "Process ID : ",os.getpid()
 		shutdown = [False]
-		print "getting config data from config.xml ..."
 		# data retreived from config.xml file 
 		DOMTree = xml.dom.minidom.parse("../config.xml")
 		config = DOMTree.documentElement
@@ -25,6 +27,9 @@ def main():
 		common_configs = config.getElementsByTagName("common_configs")[0]
 		router_ip = common_configs.getElementsByTagName("router_ip")[0]
 		router_ip = str(router_ip.childNodes[0].data)
+
+		transportTime = common_configs.getElementsByTagName("transport_time")[0] 
+		transportTime = int(transportTime.childNodes[0].data) * 60 # convert to seconds
 	
 		# configs specefic for shuttles
 		shuttle_configs = config.getElementsByTagName("shuttle_configs")[0]
@@ -32,23 +37,23 @@ def main():
 		Type = str(Type.childNodes[0].data)
 		name = shuttle_configs.getElementsByTagName("name")[0]
 		name = str(name.childNodes[0].data)
-		transportTime = shuttle_configs.getElementsByTagName("transport_time")[0] 
-		transportTime = int(transportTime.childNodes[0].data) * 60 # convert to seconds seconds 
-
-		print "Got config data !!"
-		time.sleep(5)
+		print "Configuration data:"
+		print "\t router_ip: ",	router_ip
+		print "\t transport Time: ",transportTime							
+		print "\t name: ",	name						 
+		print "\t type: "	,Type
+		
 		# data should be retreived from database 
 		print "getting data from database ...."
 		Priority=2
-		Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'009'},\
-									'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
+		Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'002'}}#,\
+									#'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
 									
-		machine4 = {'Name':'machine_4','ProcessingTime':'010'}
+		machine4 = {'Name':'machine_4','ProcessingTime':'001'}
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
 		machines = {}
-		print "Machines_dic : " , Machines_dic
+		#print "Machines_dic : " , Machines_dic
 		print "Got data from the database !!"
-		time.sleep(5)
 		
 		print ("please enter the expected End Time in the form <02:30>")
 		EndTime = raw_input('>>>')
@@ -77,17 +82,6 @@ def main():
 				address_book = myInterface.get_address_book()
 				print_address_book(address_book)
 	
-			# the user can send message to other clients by entering:
-			# SEND <receiver name> <message data>
-			# e.g.: SEND Bob Hi Bob, how are you?
-			elif input_text.startswith('SEND'):
-				tmp = input_text.partition(' ')
-				tmp = tmp[2].partition(' ')
-				recvname = tmp[0]
-				data = tmp[2]
-		
-				# send the message using the 'sendmessage()' method of the p2p object
-				myShuttle.sendMessageFunc('TCP', recvname,'','ADD', data)
 
 			elif input_text.startswith('CANCEL'):
 				machineslist = myShuttle.get_required_machines_list()
@@ -97,7 +91,11 @@ def main():
 			elif input_text.startswith('TIME'):
 				print "current time: ",datetime.datetime.now()
 
-	except KeyboardInterrupt:
+			elif input_text.startswith('TARGET'):
+				myShuttle.get_target_list()
+
+	except :
+		print ("Error happened in the main function")
 		sys.exit()
 
 	
