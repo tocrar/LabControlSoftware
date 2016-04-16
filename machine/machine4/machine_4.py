@@ -12,6 +12,8 @@ from subprocess import call
 from xml.dom.minidom import parse
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
+from Tkinter import *
+import copy
 
 #-------------------------------- project includes ------------------------------------#
 #sys.path.append("../../tests")
@@ -27,9 +29,13 @@ class Machine():
 
 
 	def __init__(self,trnsportTime,addHandler,sendMessage,shutdown):
+
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.shutdown = shutdown
+		self.__create_row_gui = False
+		self.__gui_rows_counter = 0
+		self.__new_task_name = ''
 		self.__backup_file = 0 
 		self.__backup_file_lock = threading.Lock()
 		print "current time :"+ str(datetime.datetime.now()) + '\n'
@@ -175,6 +181,7 @@ class Machine():
 
 		#handler for arriving tasks  
 	def taskArrived(self,message): # cannot make it private because it is called outside the class in addhandler
+		print message
 		tmpmsg = message['data']
 		tempint = list(tmpmsg)
 		taskNum = int(tempint[0])
@@ -209,6 +216,10 @@ class Machine():
 			ET.SubElement(task_element,'ProcessingRmainingTime') 
 			ET.SubElement(task_element,'Status')
 			self.__backup_file.write('backup_machine4.xml')
+
+			# set this flag to true to create new row in the gui 
+			self.__create_row_gui = True
+			self.__new_task_name = message['sendername']
 			#print response
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULEDM4', response)
 
@@ -417,60 +428,107 @@ class Machine():
 			print("|\t%d\t\t|\t%d:%d\t\t|\t%d:%d\t\t|\t%d:%d\t\t"%(i,tempStart/3600,(tempStart%3600)/60,tempDuration/3600,(tempDuration%3600)/60,tempEnd/3600,(tempEnd%3600)/60))
 
 ##############################################
+	def set_create_row_gui_flag(self):
+		count = 0 
+		while True:
+			element = queueElement(2,3456,34,'shuttle_'+str(count),3,2)
+			self.__taskDic[element._Name]= element 
+			self.__new_task_name = element._Name
+			self.__create_row_gui = True 
+			print "flag set right ......."
+			print "task dict: ",self.__taskDic
+			count = count + 1 
+			time.sleep(10)
 
+	def gui_funtion(self):
+		root = Tk()
 
+		machine_name_frame = Frame(root)
+		machine_name_frame.pack(side=TOP, fill=X, padx=1, pady=1)
+		machine_name= StringVar()
+		machine_name_label = Label( machine_name_frame, textvariable=machine_name,font = 80, relief=RAISED,height = 5 ,width = 20 )
+		machine_name.set("FREASEMACHINE")
+		machine_name_label.pack(side=LEFT)
 
-# def main():
+		Aktuelle_Zeit = StringVar()
+		
+		Aktuelle_Zeit_label = Label( machine_name_frame, textvariable=Aktuelle_Zeit, relief=RAISED,height = 5 ,width = 40 )
+		Aktuelle_Zeit.set("Zeit")
+		Aktuelle_Zeit_label.pack(side=LEFT)
 
-# 	try:
-# 		# Open XML document using minidom parser
-# 		DOMTree = xml.dom.minidom.parse("../../config.xml")
-# 		config = DOMTree.documentElement
-# 		print os.getpid()
-# 		print "main statrted ....."
-# 		shutdown = [False]
-# 		if len(sys.argv) !=3:
-# 			print "error"
-# 			print"Usage : filename.py <router_ip> <send_name>"
-# 			sys.exit()
+		rows_list = []
+		status_dic ={}
+		# function responsible for updating the GUI after (1000 msec)
+		def outer_update(root,task_dic):
+			def update():
 
-# 		router_ip = config.getElementsByTagName("router_ip")[0]
-# 		router_ip = router_ip.childNodes[0].data
+				if (self.__create_row_gui): # need to check for the count of rows 
+					print "creating new row for: ",self.__taskDic[self.__new_task_name]
 
-# 		#router_ip = sys.argv[1]
-# 		name = sys.argv[2]
-# 		trnasTime = 2 * 60 # in seconds 
-# 		Type = "machine"
-# 		print "router ip is : ",router_ip
-# 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-# 		myScheduler = Machine(trnasTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
-# 	 	myInterface.display_message_list() 
-# 		status = myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
-# 		print "status from main", status
-# 		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
+					self.__gui_rows_counter = self.__gui_rows_counter + 1 
+					print "gui rows counter: " ,self.__gui_rows_counter
+					self.__create_row_gui = False 
+					row = Frame(root)
+					row.pack(side=TOP, fill=X, padx=1, pady=1)
 
-# 		t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
-# 		t_handleTasks.start()
+					number = StringVar()
+					label1 = Label( row, textvariable=number, relief=RAISED,height = 5 ,width = 20 )
+					number.set(self.__gui_rows_counter)
+					label1.pack(side=LEFT)
 
-# 		while not shutdown[0]:
-# 			# save the user's input in a variable
-# 			input_text = raw_input('>>>')
-	
-# 			#if the user enters 'EXIT', the inifinte while-loop quits and the
-# 		# program can terminate
-# 			if input_text == 'EXIT':
-# 				shutdown[0] = True
-# 				del myInterface
-# 			elif input_text == 'PRINTQUEUE':
-# 				myScheduler.print_elements_queue();
-# 			elif input_text == 'PRINTFREESLOTS':
-# 				myScheduler.printSlots()
-# 			elif input_text.startswith('TIME'):
-# 				print "current time: ",datetime.datetime.now()
-# 	except KeyboardInterrupt:
-# 		shutdown = [True]
-# 		sys.exit()
+					Auftrag = StringVar()
+					label2 = Label( row, textvariable=Auftrag, relief=RAISED,height = 5 ,width = 40 )
+					Auftrag.set(task_dic[self.__new_task_name]._ContractNumber)
+					label2.pack(side=LEFT)
 
+					Zeit = StringVar()
+					label2 = Label( row, textvariable=Zeit, relief=RAISED,height = 5 ,width = 40 )
+					Zeit.set(str(task_dic[self.__new_task_name]._StartTime) + ' - ' + str(task_dic[self.__new_task_name]._EndTime))
+					label2.pack(side=LEFT)
 
-# if __name__ == "__main__":
-# 	main()
+					Status = StringVar()
+					label2 = Label( row, textvariable=Status, relief=RAISED,height = 5 ,width = 40 )
+					Status.set(task_dic[self.__new_task_name]._Status)
+					label2.pack(side=LEFT)
+   					
+					status_dic[self.__new_task_name]= Status
+					rows_list.append(row)
+					print rows_list		
+				for st in status_dic:
+					print " staus name: ",st
+					print status_dic
+					status_dic[st].set(self.__taskDic[st]._Status) 
+				Aktuelle_Zeit.set( datetime.datetime.now())
+				root.update_idletasks()
+				print task_dic
+				root.after(1000,update)
+			update()
+
+	#-----------------------------------  the frame for the header of the table ----------------------------------
+
+		header = Frame(root)
+		header.pack(side=TOP, fill=X, padx=1, pady=1)
+
+		number = StringVar()
+		label1 = Label( header, textvariable=number, relief=RAISED,height = 5 ,width = 20 )
+		number.set("ID")
+		label1.pack(side=LEFT)
+
+		Auftrag = StringVar()
+		label2 = Label( header, textvariable=Auftrag, relief=RAISED,height = 5 ,width = 40 )
+		Auftrag.set("Auftrag")
+		label2.pack(side=LEFT)
+
+		Zeit = StringVar()
+		label2 = Label( header, textvariable=Zeit, relief=RAISED,height = 5 ,width = 40 )
+		Zeit.set("Zeit")
+		label2.pack(side=LEFT)
+
+		Status = StringVar()
+		label2 = Label( header, textvariable=Status, relief=RAISED,height = 5 ,width = 40 )
+		Status.set("Status")
+		label2.pack(side=LEFT)
+	#----------------------------------- END the frame for the header of the table ----------------------------------
+ 		dict2 = copy.deepcopy(self.__taskDic)
+		outer_update(root,self.__taskDic)
+		root.mainloop()

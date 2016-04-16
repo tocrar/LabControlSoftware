@@ -53,6 +53,15 @@ def main():
 		t_updateData = threading.Thread(target = myScheduler.update_backup_data)
 		t_updateData.start()
 
+		#start gui handler function 
+		t_gui = threading.Thread(target = myScheduler.gui_funtion)
+		t_gui.start()
+
+
+		##run function to set create gui flag to 1 every 2 seconds for testing  
+		#t_set_create_row_gui = threading.Thread(target = myScheduler.set_create_row_gui_flag)
+		#t_set_create_row_gui.start()
+
 		#------------------------------------ END OF INITIALIZATIONS ----------------------------------#
 
 		#-------------------------------------- START THE MAIN LOOP  --------------------------------# 
