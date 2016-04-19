@@ -1,0 +1,21 @@
+<!--tutorial for XML file could be found under this link-->
+<!--http://www.tutorialspoint.com/python/python_xml_processing.htm-->
+
+<configs>
+   <common_configs>
+      <router_ip>192.168.1.1</router_ip>
+       <transport_time>1</transport_time>
+   </common_configs>
+
+   <shuttle_configs>
+      <type>shuttle</type>
+      <name>shuttle_1</name>
+   </shuttle_configs>
+
+   <machine_configs>
+       <type>machine</type>
+      <name>machine_4</name>
+      <test>kk</test>
+   </machine_configs>
+
+</configs>

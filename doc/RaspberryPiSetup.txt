@@ -1,0 +1,108 @@
+Raspberry Pi 2 setup:
+
+1.install Raspbian
+
+2.keyboard_layout
+
+	Raspi-config
+		4 Internationalisation Options
+		13 Change Keyboard Layout
+			Generic 105-key (Intl) PC
+			Other
+			German
+			German
+			The default for the keyboard layout
+			No compose key
+			<No>
+	
+3.Change Timezone
+	Raspi-config
+		4 Internationalisation Options
+		12 Change Timezone
+			Europe
+			Berlin
+	<Finish>
+	sudo reboot
+
+4.login
+	raspberrypi login: pi
+	Password: raspberry
+
+	# Hostname ändern
+
+	sudo nano /etc/hostname
+		#neuer Hostname hier eintragen
+	sudo nano /etc/hosts
+		# goto line where 127.0.1.1
+			#neuer Hostname = dem in /etc/hostname
+
+5.autologin
+	sudo nano /etc/inittab
+		suche nach:  1:2345:respawn:/sbin/getty 115200 tty1
+		setze ein # for die Zeile: #1:2345:respawn:/sbin/getty 115200 tty1
+		darunter schreibe: 1:2345:respawn:/bin/login -f pi tty1 </dev/tty1 >/dev/tty1 2>&1
+		save file (strg+x...)
+	sudo reboot
+
+6.hold shift while boot
+	Edit config
+		comment out the Noobs gens #
+		For touchpad 5":
+			hdmi_force_hotplug=1
+			hdmi_group=2
+			hdmi_mode=1
+			hdmi_mode=87
+			hdmi_cvt 800 480 60 6 0 0 0
+			max_usb_current=1
+		
+		For touchpad 7":
+			lcd_rotate=2
+		OK
+	EXIT
+	sudo reboot
+
+7.Desktop
+	startx
+		optinal:Change taskbar
+			Add LxTerminal, leafpad, python2 to the dektop
+
+8.Updates&Upgrades	(Internet muss vorhanden sein)
+	LxTerminal
+		sudo apt-get update
+		sudo apt-get upgrade
+		sudo reboot
+
+9.zusatzsachen		
+	apache web server with mysql and phpmyadmin:
+		LxTerminal
+			sudo bash
+			groupadd www-data
+			usermod -a -G www-data www-data
+			apt-get install apache2 apache2-doc apache2-utils
+			apt-get install libapache2-mod-php5 php5 php-pear php5-xcache
+			apt-get install php5-mysql
+			apt-get install mysql-server mysql-client
+				#password für mysql setzen: raspberry
+			sudo reboot
+
+			sudo bash
+			apt-get install phpmyadmin
+				#choose apache2
+				#Configure database... <Yes>
+				#Password from mysql: raspberry
+				#Password for phpmyadmin: raspberry
+
+			nano /etc/apache2/apache2.conf
+				#go to the end and ad:
+				Include /etc/phpmyadmin/apache.conf
+				#save file(strg+x...)
+			/etc/init.d/apache2 restart
+		
+		Check if it works:
+			Browser
+				ip_of_your_pi/phpmyadmin
+					login: root
+					Passw.: raspberry
+
+	Python mysql interface:
+		sudo apt-get install python-mysqldb
