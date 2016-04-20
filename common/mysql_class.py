@@ -190,3 +190,32 @@ SELECT (result as list of lists):
 
 '''
 #----------------------------------------------------------------------------------------------------------------
+
+
+def dbtest():
+        host = "192.168.1.54"
+        user = "Shuttle"
+        passwd = "raspberry"
+        db = "ip"
+        mydb = sqldb(host,user,passwd,db)  
+
+        KA_Nummer = 1000022 # I will get this number from the cmd 
+        sql = "SELECT * FROM kundenauftrag WHERE KA_Nummer = %s " % (KA_Nummer)
+        data = mydb.sqlquery(sql)
+        #print"result...", result 
+	print"KA_Nummer : " , data["rows"][0]["KA_Nummer"]
+	print "Auftrag Priority", data["rows"][0]["KA_Prio"]
+	
+        # get arbeitsplan    
+        process_vorgeange = [data["rows"][0]["UB"],data["rows"][0]["MO"],data["rows"][0]["LA"],data["rows"][0]["EV"],data["rows"][0]["RF"],data["rows"][0]["CH"]]
+        
+        for vorgang in process_vorgeange:
+                sql = "SELECT * FROM arbeitsplan WHERE arbeitsplan.ID = %s " % (vorgang)
+                plan = mydb.sqlquery(sql)
+                print ("Vorgang % d : .... %s" % (vorgang,plan)) 
+
+
+
+
+if __name__ == "__main__":
+	dbtest()

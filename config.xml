@@ -1,5 +1,5 @@
 <!--tutorial for XML file could be found under this link-->
-<!--http://www.tutorialspoint.com/python/python_xml_processing.htm-->
+<!--h-->
 
 <configs>
    <common_configs>
@@ -14,9 +14,8 @@
 
    <machine_configs>
        <type>machine</type>
-      <name>machine_1</name>
-      <gui_name>Drehmachine</gui_name>
-      <test>kk</test>
+      <name>machine_2</name>
+      <gui_name>Freasemachine</gui_name>
    </machine_configs>
 
 </configs>
