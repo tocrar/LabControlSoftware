@@ -56,6 +56,17 @@ class Shuttle:
 			print "task : ",task 
 			self.__machines[task] = machine_task.TaskForMachine(MachinesDic[task]['Name'],MachinesDic[task]['ProcessingTime'],self.Priority)
 		print "initializing shuttle done "
+		# check for the correct format of the input data 
+		if (self.ContractNumber > 9 or type(self.ContractNumber) != int):
+			print "Error : contract number should be in the range [0 - 9]"
+			self.shutdown[0] = True
+			sys.exit()
+
+		if (self.Priority > 9 or type(self.Priority) != int): 
+			print "Error : priority should be in the range [0 - 9]"
+			self.shutdown[0] = True 
+			sys.exit()
+
 		msg =  str(self.ContractNumber)+str(self.Priority)+str(machine4['ProcessingTime'])+str(self.EndTime)+self.get_machine_4_min_start_time()
 		self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
 

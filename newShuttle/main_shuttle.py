@@ -18,7 +18,7 @@ def main():
 #------------------------------------ INITIALIZATIONS ----------------------------------# 
 		
 		print "main statrted ....."
-				print "Process ID : ",os.getpid()
+		print "Process ID : ",os.getpid()
 		shutdown = [False]
 		# data retreived from config.xml file 
 		DOMTree = xml.dom.minidom.parse("../config.xml")
@@ -87,7 +87,7 @@ def main():
 				machineslist = myShuttle.get_required_machines_list()
 				for machine in machineslist:
 					myShuttle.sendMessageFunc('TCP',machine,'','CANCEL','hello')
-
+					myShuttle.sendMessageFunc('TCP',machine4['Name'],'','CANCEL','hello')
 			elif input_text.startswith('TIME'):
 				print "current time: ",datetime.datetime.now()
 

@@ -54,8 +54,8 @@ def main():
 		t_updateData.start()
 
 		#start gui handler function 
-		t_gui = threading.Thread(target = myScheduler.gui_funtion)
-		t_gui.start()
+		#t_gui = threading.Thread(target = myScheduler.gui_funtion)
+		#t_gui.start()
 
 
 		##run function to set create gui flag to 1 every 2 seconds for testing  

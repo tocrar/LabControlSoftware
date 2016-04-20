@@ -1,3 +1,6 @@
+# This class for the machines (milling chine,Lathe, ....) , but not for assembly station
+
+
 #--------------------------------- general includes ----------------------------------#
 import datetime
 import operator 
@@ -9,6 +12,9 @@ import threading
 from threading import Timer
 from subprocess import call
 import xml.etree.ElementTree as ET
+import copy
+
+from Tkinter import *
 
 #-------------------------------- project includes ------------------------------------#
 sys.path.append('../includes')
@@ -22,15 +28,20 @@ from timeTest import myTime
 
 class MachineScheduler():
 
-	def __init__(self,trnsportTime,addHandler,sendMessage,shutdown):
+	def __init__(self,trnsportTime,addHandler,sendMessage,shutdown,machine_gui_name):
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.shutdown = shutdown 
+		self.__machine_gui_name = machine_gui_name
 		self.__backup_file = 0
 		self.__backup_file_lock = threading.Lock()
 		self.__scheduleFail = False
 		self.__newTask = {}
 		self.__taskDic={}
+		self.__create_row_gui = False
+		self.__gui_rows_counter = 0 
+		self.__new_task_name = ''
+		self.__task_to_delete = ''
 		print "current time :"+ str(datetime.datetime.now())+"\n" 
 		#self.__gpioInterface = gpio_Interface()
 		#self.__gpioInterface.clearpins()# works only for beagle bone 
@@ -60,7 +71,7 @@ class MachineScheduler():
 					t=Timer(value._ProcessingTime,self.timeout,[value._Name]) # argument has to passed as an array 
 					t.start() 
 					print "Timer started"		
-			time.sleep(30)
+			time.sleep(5)
 
 	def timeout(self,name):
 		print "task finished ......"
@@ -141,6 +152,9 @@ class MachineScheduler():
 			queue.remove(temp_task)
 			self.__backup_file.write('backup_machine.xml')
 			self.__backup_file_lock.release()
+
+			# set the name to remove the task from the GUI 
+			self.__task_to_delete = msg['sendername']
 
 			# remove task from tasks dictionary
 			del self.__taskDic[msg['sendername']]
@@ -271,6 +285,10 @@ class MachineScheduler():
 			ET.SubElement(task_element,'Status')
 			self.__backup_file.write('backup_machine.xml')
 
+			# set this flag to true to create new row in the gui 
+			self.__create_row_gui = True
+			self.__new_task_name = message['sendername']
+
 		#test fails
 		if(not taskScheduled):
 			del self.__taskDic[message['sendername']]
@@ -302,3 +320,133 @@ class MachineScheduler():
 
 
 
+##############################################
+	def set_create_row_gui_flag(self):
+		count = 0 
+		while True:
+			element = queueElement(2,3456,34,'shuttle_'+str(count),3,2)
+			self.__taskDic[element._Name]= element 
+			self.__new_task_name = element._Name
+			self.__create_row_gui = True 
+			print "flag set right ......."
+			print "task dict: ",self.__taskDic
+			count = count + 1 
+			time.sleep(10)
+
+
+	def gui_funtion(self):
+		root = Tk()
+
+		machine_name_frame = Frame(root)
+		machine_name_frame.pack(side=TOP, fill=X, padx=1, pady=1)
+		machine_name= StringVar()
+		machine_name_label = Label( machine_name_frame, textvariable=machine_name,font = 80, relief=RAISED,height = 5 ,width = 20 )
+		machine_name.set(self.__machine_gui_name)
+		machine_name_label.pack(side=LEFT)
+
+		Aktuelle_Zeit = StringVar()
+		
+		Aktuelle_Zeit_label = Label( machine_name_frame, textvariable=Aktuelle_Zeit, relief=RAISED,height = 5 ,width = 40 )
+		Aktuelle_Zeit.set("Zeit")
+		Aktuelle_Zeit_label.pack(side=LEFT)
+		
+		rows_dict={}
+		status_label_bgcolor = {}
+		status_dic ={}
+
+		# callback function for GUI destry event 
+		def gui_close():
+			self.shutdown[0] = True 
+			root.destroy()
+			sys.exit()
+		root.protocol("WM_DELETE_WINDOW",gui_close)
+
+		# function responsible for updating the GUI after (1000 msec)
+		def outer_update(root,task_dic):
+			def update():	
+					
+	
+				if (self.__create_row_gui): # need to check for the count of rows 
+					print "creating new row for: ",self.__taskDic[self.__new_task_name]
+
+					self.__gui_rows_counter = self.__gui_rows_counter + 1 
+					print "gui rows counter: " ,self.__gui_rows_counter
+					self.__create_row_gui = False 
+					row = Frame(root)
+					row.pack(side=TOP, fill=X, padx=1, pady=1)
+	
+					number = StringVar()
+					label1 = Label( row, textvariable=number, relief=RAISED,height = 5 ,width = 20 )
+					number.set(self.__gui_rows_counter)
+					label1.pack(side=LEFT)
+	
+					Auftrag = StringVar()
+					label2 = Label( row, textvariable=Auftrag, relief=RAISED,height = 5 ,width = 40 )
+					Auftrag.set(task_dic[self.__new_task_name]._ContractNumber)
+					label2.pack(side=LEFT)
+	
+					Zeit = StringVar()
+					temp_start_time = str(task_dic[self.__new_task_name]._StartTime /3600)+':'+str((task_dic[self.__new_task_name]._StartTime%3600)/60)
+					temp_end_time = str(task_dic[self.__new_task_name]._WorstCaseFinishingTime/3600)+':'+str((task_dic[self.__new_task_name]._WorstCaseFinishingTime%3600)/60)
+					label2 = Label( row, textvariable=Zeit, relief=RAISED,height = 5 ,width = 40 )
+					Zeit.set(temp_start_time + ' - ' + temp_end_time)
+					label2.pack(side=LEFT)
+	
+					Status = StringVar()
+					label2 = Label( row, textvariable=Status,bg = "yellow", relief=RAISED,height = 5 ,width = 40 )
+					Status.set(task_dic[self.__new_task_name]._Status)
+					label2.pack(side=LEFT)
+	   					
+					status_dic[self.__new_task_name]= Status
+					status_label_bgcolor[self.__new_task_name] = label2
+					rows_dict[self.__new_task_name]= row
+					print rows_dict	
+				# check if a task removed from taskDic, to dele it also from GUI 	
+				if(self.__task_to_delete != ''):
+						rows_dict[self.__task_to_delete].pack_forget()
+						rows_dict[self.__task_to_delete].destroy()
+						del status_dic[self.__task_to_delete]
+						del status_label_bgcolor[self.__task_to_delete]	
+						del rows_dict[self.__task_to_delete]
+						self.__task_to_delete = ''
+				for st in status_dic:
+					print " staus name: ",st
+					print status_dic
+					status_dic[st].set(self.__taskDic[st]._Status) 
+					if(self.__taskDic[st]._Status == "Running"):
+						status_label_bgcolor[self.__taskDic[st]._Name].configure(bg = 'green')
+						print "status bg color of ",self.__taskDic[st]._Name
+				Aktuelle_Zeit.set( datetime.datetime.now())
+				root.update_idletasks()
+				print task_dic
+				root.after(500,update)
+			update()
+
+	#-----------------------------------  the frame for the header of the table ----------------------------------
+
+		header = Frame(root)
+		header.pack(side=TOP, fill=X, padx=1, pady=1)
+
+		number = StringVar()
+		label1 = Label( header, textvariable=number, relief=RAISED,height = 5 ,width = 20 )
+		number.set("ID")
+		label1.pack(side=LEFT)
+
+		Auftrag = StringVar()
+		label2 = Label( header, textvariable=Auftrag, relief=RAISED,height = 5 ,width = 40 )
+		Auftrag.set("Auftrag")
+		label2.pack(side=LEFT)
+
+		Zeit = StringVar()
+		label2 = Label( header,textvariable=Zeit, relief=RAISED,height = 5 ,width = 40 )
+		Zeit.set("Zeit")
+		label2.pack(side=LEFT)
+
+		Status = StringVar()
+		label2 = Label( header, textvariable=Status, relief=RAISED,height = 5 ,width = 40 )
+		Status.set("Status")
+		label2.pack(side=LEFT)
+	#----------------------------------- END the frame for the header of the table ----------------------------------
+ 		dict2 = copy.deepcopy(self.__taskDic)
+		outer_update(root,self.__taskDic)
+		root.mainloop()

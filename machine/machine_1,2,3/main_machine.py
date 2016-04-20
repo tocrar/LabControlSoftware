@@ -31,6 +31,7 @@ def main():
 		machine_configs = configs.find('machine_configs')
 		name = machine_configs.find('name').text
 		Type = machine_configs.find('type').text
+		machine_gui_name = machine_configs.find('gui_name').text
 		print "Configuration data:"
 		print "\t router_ip: ",	router_ip
 		print "\t transport Time: ",trnasportTime							
@@ -38,7 +39,7 @@ def main():
 		print "\t type: "	,Type													
 		shutdown = [False]
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-		myScheduler = MachineScheduler(trnasportTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
+		myScheduler = MachineScheduler(trnasportTime,myInterface.add_handler,myInterface.sendmessage,shutdown,machine_gui_name)
 		#adding hanlder to the requests  
 		myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
 		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
@@ -51,6 +52,10 @@ def main():
 		#start update backup data thread 
 		t_updateData = threading.Thread(target = myScheduler.update_backup_data)
 		t_updateData.start()
+
+		#start gui handler function 
+		t_gui = threading.Thread(target = myScheduler.gui_funtion)
+		t_gui.start()
 		#------------------------------------ END OF INITIALIZATIONS ----------------------------------#
 
 		#-------------------------------------- START THE MAIN LOOP  ----------------------------------# 

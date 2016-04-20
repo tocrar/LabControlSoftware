@@ -1,3 +1,5 @@
+# This class for the assembly station 
+
 
 #--------------------------------- general includes ----------------------------------#
 import datetime
@@ -156,7 +158,8 @@ class Machine():
 			print ("%s: you are trying to remove a not existing task"% self.__removeTask.__name__)
 
 
-#handler to cancel task scheduling and remove it from the task queue of the machine 
+#############################################################
+#handler to cancel task scheduling and remove it from the task queue of the machine
 	def cancelRequest(self,msg):
 		print "I got cancel request from: ",msg['sendername']
 		self.__removeTask(msg)

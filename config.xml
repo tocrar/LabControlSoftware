@@ -14,7 +14,8 @@
 
    <machine_configs>
        <type>machine</type>
-      <name>machine_4</name>
+      <name>machine_1</name>
+      <gui_name>Drehmachine</gui_name>
       <test>kk</test>
    </machine_configs>
 
