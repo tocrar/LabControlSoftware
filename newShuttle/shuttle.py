@@ -6,15 +6,11 @@ import datetime
 from threading import Timer
 import operator
 import datetime
+import sys 
 
 #-------------------------------- project includes ------------------------------------#
 import machine_task
 
-# sys.path.append('../common')
-# import machine_task
-# from p2p_framework import P2P_Interface
-
- 
 
 # user defined method to print the address book
 def print_address_book( address_book ):
@@ -30,35 +26,49 @@ def print_address_book( address_book ):
 
 class Shuttle:
 
-	def __init__(self,shutdown,Priority,EndTime,MachinesDic,machine4,addHandler,sendMessage,address_book,transportTime):
-		print "initializing shuttle ........"
-		print "current time :",  datetime.datetime.now()
-		self.shutdown = shutdown
-		self.sendMessageFunc = sendMessage 
-		self.addHandlerFunc = addHandler
-		self.__getAddressBookFunc = address_book   # list is given as a list of tuples (name, type): [['Alice', 'shuttle'],['Bob', 'machine']
-		self.__TransportTime = transportTime
-		self.__got_machine_4_response = False
-		self.Type = "shuttle"
-		signal.signal(signal.SIGINT,self.kill_signal_handler)
-		self.Priority = Priority
-		print ("please enter the contract Number" )
-		self.ContractNumber = raw_input('>>>')
-		self.ContractNumber = int(self.ContractNumber)
-		self.EndTime = EndTime
-		self.EndTime = self.EndTime.split(":")
-		self.EndTime = (''.join(self.EndTime))
-		signal.signal(signal.SIGINT,self.kill_signal_handler)
-		self.__machines ={}
-		# getting tasks information 
-		self.__machine_4 = machine_task.TaskForMachine(machine4['Name'],machine4['ProcessingTime'],self.Priority)
-		for task in MachinesDic:
-			print "task : ",task 
-			self.__machines[task] = machine_task.TaskForMachine(MachinesDic[task]['Name'],MachinesDic[task]['ProcessingTime'],self.Priority)
-		print "initializing shuttle done "
-		msg =  str(self.ContractNumber)+str(self.Priority)+str(machine4['ProcessingTime'])+str(self.EndTime)+self.get_machine_4_min_start_time()
-		self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
+	def __init__(self,shutdown,Priority,EndTime,MachinesDic,machine4,addHandler,sendMessage,address_book,transportTime,contractNumber):
+		try:
+			print "initializing shuttle ........"
+			print "current time :",  datetime.datetime.now()
+			self.shutdown = shutdown
+			self.sendMessageFunc = sendMessage 
+			self.addHandlerFunc = addHandler
+			self.__getAddressBookFunc = address_book   # list is given as a list of tuples (name, type): [['Alice', 'shuttle'],['Bob', 'machine']
+			self.__TransportTime = transportTime
+			self.__got_machine_4_response = False
+			self.Type = "shuttle"
+			#signal.signal(signal.SIGINT,self.kill_signal_handler) # signals works only in main thread 
+			self.Priority = Priority
+			self.ContractNumber = contractNumber
+			self.EndTime = EndTime
+			self.EndTime = self.EndTime.split(":")
+			self.EndTime = (''.join(self.EndTime))
+			#signal.signal(signal.SIGINT,self.kill_signal_handler)
+			self.__machines ={}
+			# getting tasks information 
+			self.__machine_4 = machine_task.TaskForMachine(machine4['Name'],machine4['ProcessingTime'],self.Priority)
+			for task in MachinesDic:
+				print "task : ",task 
+				self.__machines[task] = machine_task.TaskForMachine(MachinesDic[task]['Name'],MachinesDic[task]['ProcessingTime'],self.Priority)
+			print "initializing shuttle done "
+			# check for the correct format of the input data 
+			if (self.ContractNumber > 9 or type(self.ContractNumber) != int):
+				print "Error : contract number should be in the range [0 - 9]"
+				self.shutdown[0] = True
+				sys.exit()
 
+			if (self.Priority > 9 or type(self.Priority) != int): 
+				print "Error : priority should be in the range [0 - 9]"
+				self.shutdown[0] = True 
+				sys.exit()
+			# check if machine 4 in address book befor sending it a message  
+			address_book = self.__getAddressBookFunc()
+			print "address book : ",address_book
+			#msg =  str(self.ContractNumber)+str(self.Priority)+str(machine4['ProcessingTime'])+str(self.EndTime)+self.get_machine_4_min_start_time()
+			#self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
+		except:
+			print "ERROR whlie initializing shuttle.......  !!!"
+			return 
 
 	def kill_signal_handler(self,signal,frame):
 		print "you pressed ctrl+c !!"
@@ -69,6 +79,19 @@ class Shuttle:
 		currenttime = datetime.datetime.now()
 		currenttimeinseconds = ( currenttime.hour * 60 + currenttime.minute ) * 60
 		return currenttimeinseconds
+                
+        def getStatus(self):
+                temp_finished = True
+                for machine in self.__machines:
+                      print machine
+                      temp_finished =  temp_finished and self.__machines[machine]._Status_Finished
+                print"getStatus temp_finished Success: ",temp_finished
+                print "montage station status ",self.__machine_4._Status_Finished
+                temp_finished =  temp_finished and self.__machine_4._Status_Finished
+                print " status for all ",temp_finished
+               
+                         
+                                          
 
 
 	def schedule_fail(self,message):
