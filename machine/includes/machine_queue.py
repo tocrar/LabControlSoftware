@@ -16,6 +16,7 @@ class queueElement:
 		self._WorstCaseFinishingTime = EndTime
 		self._TempWorstCaseFinishingTime = 0
 		self._ContractNumber = ContractNum
+		self._confirm = False
 		self._Status ='Unscheduled' #  ('Running,Scheduled','Unscheduled','Stopped')
 		#print ("new task created with -->> Required processing time  : %s , priority: %s , procssing status : %s , processing left time : %s"  %(self._ProcessingTime ,  self._Priority ,self._processingStatus,self._ProcessingRmainingTime))
 		

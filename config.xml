@@ -1,0 +1,6 @@
+<!--tutorial for XML file could be found under this link-->
+<!--http://www.tutorialspoint.com/python/python_xml_processing.htm-->
+
+<configs>
+<router_ip>172.16.1.1</router_ip>
+</configs>

@@ -66,7 +66,7 @@ class MachineScheduler():
 		#self.__gpioInterface.clearpins() # works only for beagle bone 
 		msg={}
 		msg['sendername']= name
-		self.removeTask(msg)
+		self.__removeTask(msg)
 
 	def __del__(self):
 		print "machine destructor......"
@@ -92,14 +92,20 @@ class MachineScheduler():
 		return True
 
 ####################################################
-	#handler to cancel task scheduling and remove it from the task queue of the machine 
-	def removeTask(self,msg):
+	 
+	def __removeTask(self,msg):
 		if msg['sendername'] in self.__taskDic:
 			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
 			del self.__taskDic[msg['sendername']]
 			print "Task removed ......" 
 		else:
-			print ("%s: you are trying to remove a not existing task"% self.removeTask.__name__)
+			print ("%s: you are trying to remove a not existing task"% self.__removeTask.__name__)
+
+#############################################################
+#handler to cancel task scheduling and remove it from the task queue of the machine
+	def cancelRequest(self,msg):
+		print "I got cancel request from: ",msg['sendername']
+		self.__removeTask(msg)
  
 ####################################################
 	def __converttoseconds(self,strtime):
@@ -204,6 +210,9 @@ class MachineScheduler():
 		if (taskScheduled):
 			response = str(self.__taskDic[message['sendername']]._StartTime) +' '+ str(self.__taskDic[message['sendername']]._WorstCaseFinishingTime)					
 			self.sendMessageFunc('TCP', message['sendername'],'', 'SCHEDULED', response)
+			t=Timer(6,self.__check_confirmation,[message['sendername']]) # argument has to passed as an array 
+			t.start()
+			print "Confirmation Timer started" 
 		#test fails
 		if(not taskScheduled):
 			del self.__taskDic[message['sendername']]
@@ -212,6 +221,25 @@ class MachineScheduler():
 		self.print_elements_queue()
 		
 
+	# after time our of check timer , check for getting confirmation from shuttle 
+	def __check_confirmation(self,name):
+		if name in self.__taskDic:
+			if self.__taskDic[name]._confirm:
+				print("I got confirmation from %s "%name)
+			else:
+				print("I didn't got confirmation from %s "%name)
+				msg = {'sendername':name}
+				self.__removeTask(msg)
+		else:
+			print("%s: error task is not in task dic "%self.__check_confirmation.__name__)
+
+	def confirmation_received(self,msg):
+		if msg['sendername'] in self.__taskDic:
+			print("%s from %s "%(self.confirmation_received.__name__,msg['sendername']))
+			self.__taskDic[msg['sendername']]._confirm = True
+
+		else:
+			print("%s: error ,sender name is not in task_dic"%self.confirmation_received.__name__)
 
 
 
@@ -225,14 +253,15 @@ def main():
 		sys.exit()
 	router_ip = sys.argv[1]
 	name = sys.argv[2]
-	trnasportTime = 5 * 60 # in seconds
+	trnasportTime = 2 * 60 # in seconds
 	Type = "machine"
 	print "router ip is : ",router_ip
 	myInterface = P2P_Interface(shutdown,name,Type,router_ip)
 	myScheduler = MachineScheduler(trnasportTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
 	myInterface.display_message_list() 
 	myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
-	myScheduler.addHandlerFunc('CANCEL', myScheduler.removeTask)
+	myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
+	myScheduler.addHandlerFunc('CONFIRM', myScheduler.confirmation_received)
 	t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
 	t_handleTasks.start()
 	while not shutdown[0]:

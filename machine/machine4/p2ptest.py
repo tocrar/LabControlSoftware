@@ -9,6 +9,8 @@ import time
 import threading 
 from threading import Timer
 from subprocess import call 
+from xml.dom.minidom import parse
+import xml.dom.minidom
 
 #sys.path.append("../../tests")
 #from gpiotest import gpio_Interface # works only for beagle bone 
@@ -45,6 +47,7 @@ class Machine():
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
 		print "pid is : ",os.getpid()
 	
+	# handler will be executed when "Ctl+C" will be pressed 
 	def kill_signal_handler(self,signal,frame):
 		#self.__gpioInterface.clearpins()
 		print "you pressed ctrl+c !!"
@@ -69,16 +72,18 @@ class Machine():
 					
 			time.sleep(30)
 
+	# will be executed when the task finished (could be used to call some output routines to check if the machine already done)
 	def timeout(self,name):
 		print "task finished ......"
 		#self.__gpioInterface.clearpins() # works only for beagle bone
 		msg={}
 		msg['sendername']= name
-		self.removeTask(msg)
+		self.__removeTask(msg)
 
 	def __del__(self):
 		print "machine destructor......"
 	
+	#show the shuttles in the machine queue 
 	def print_elements_queue(self):
 		print "|\tTask name\t|\tStart Time\t|\tFinish Time\t|\tProcessing Time\t|\tDeadline\t|\tStatus"
 		print "|\t---------\t|\t----------\t|\t-----------\t|\t---------\t|\t------\t\t|\t-------"
@@ -88,14 +93,21 @@ class Machine():
 
 
 ####################################################
-	#handler to cancel task scheduling and remove it from the task queue of the machine 
-	def removeTask(self,msg):
+	#Remove specific shuttle from machine queue
+	def __removeTask(self,msg):
 		if msg['sendername'] in self.__taskDic:
 			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
 			del self.__taskDic[msg['sendername']]
 			print "Task removed ......" 
 		else:
-			print ("%s: you are trying to remove a non existing task"% self.removeTask.__name__)
+			print ("%s: you are trying to remove a not existing task"% self.__removeTask.__name__)
+
+
+#handler to cancel task scheduling and remove it from the task queue of the machine 
+	def cancelRequest(self,msg):
+		print "I got cancel request from: ",msg['sendername']
+		self.__removeTask(msg)
+ 
 
 ####################################################
 	def __converttoseconds(self,strtime):
@@ -114,11 +126,9 @@ class Machine():
 
 							
 
-		#user defined function 
+		#handler for arriving tasks  
 	def taskArrived(self,message): # cannot make it private because it is called outside the class in addhandler
 		tmpmsg = message['data']
-		#print message['data']
-		#print message['sendername']
 		tempint = list(tmpmsg)
 		taskNum = int(tempint[0])
 		print "task number: ", taskNum 
@@ -128,9 +138,6 @@ class Machine():
 		minStartTime = tempint[9]+tempint[10]+tempint[11]
 		print "minStartTime: " , minStartTime
 		minStartTime = int(minStartTime) * 60 + self.getCurrentTimeInSeconds()
-		#print "minStartTime: " , minStartTime
-		#print "End time: ",self.__converttoseconds(endTime)
-		#print "self.getCurrentTimeInSeconds(): ",self.getCurrentTimeInSeconds()
 		if(self.__converttoseconds(endTime) < self.getCurrentTimeInSeconds()): # should be < tasksDic[name]._MinStartTime
 			print "end time less than current time ......"
 			return False
@@ -172,7 +179,7 @@ class Machine():
 		tempdic.clear() 
 		return True 
 
-
+	# Apply the scheduling algorithm 
 	def __scheduleTasks(self,name):
 			tasksEndTime ={}
 			currenttimeinseconds = self.getCurrentTimeInSeconds()		
@@ -193,10 +200,10 @@ class Machine():
 			print "sorted tasks according to Ealiest Deadline First " , sortdtasks
 
 			if sortdtasks:  # if the list is not empty 
-				print "the biggest deadline is ..",sortdtasks[-1] # 
+				print "the largest deadline is ..",sortdtasks[-1] # 
 				
 				if(self.__taskDic[name]._EndTime > self.__taskDic[sortdtasks[-1][0]]._EndTime): #compare the new task deadline with the biggest one in the list 								     
-					print "yes greater ya prince ........."
+					print "yes greater than the largest deadline ........."
 					
 					if ((self.__taskDic[sortdtasks[-1][0]]._EndTime + self.__taskDic[name]._ProcessingTime + self.__transportationTime) < self.__taskDic[name]._EndTime): # (case 1)
 						print "yes it's possible to assign a direct time slot after the last task  "
@@ -223,7 +230,7 @@ class Machine():
 								print("time slot num %d is not suitalbe for the task "%(i))		
 							
 				else: #  check for free time slots and see if it is possible to assign a free slot to the task 
-					print "the deadline is not the greatest........."
+					print "the deadline is not the largest........."
 					self.__freeSlots = self.getFreeTimeSlots()
 					print "come back from getFreeTimeSlots\n"
 					for i in range(len(self.__FreeSlots)):
@@ -314,8 +321,7 @@ class Machine():
 		timeSlotsList =[]
 		tasksEndTime ={}
 		orderedtasks =[]
-		
-				
+					
 		for key,value in self.__taskDic.iteritems():
 			tasksEndTime[key] =value._WorstCaseFinishingTime
 
@@ -335,13 +341,12 @@ class Machine():
 	
 		for i in range(len(orderedtasks)):
 			tempDuration = timeSlotsList[i].getEndTime() - timeSlotsList[i].getStartTime()
-			timeSlotsList[i].setDuration(tempDuration)
-				
+			timeSlotsList[i].setDuration(tempDuration)		
 			
 		self.__FreeSlots = timeSlotsList	
 		return timeSlotsList	
 
-############################3################
+############################################
 
 	def printSlots(self):
 		print "|\tSlot num.\t|\tstart Time\t|\tDuration\t|\tEnd Time"
@@ -360,6 +365,9 @@ class Machine():
 def main():
 
 	try:
+		# Open XML document using minidom parser
+		DOMTree = xml.dom.minidom.parse("../../config.xml")
+		config = DOMTree.documentElement
 		print os.getpid()
 		print "main statrted ....."
 		shutdown = [False]
@@ -367,9 +375,13 @@ def main():
 			print "error"
 			print"Usage : filename.py <router_ip> <send_name>"
 			sys.exit()
-		router_ip = sys.argv[1]
+
+		router_ip = config.getElementsByTagName("router_ip")[0]
+		router_ip = router_ip.childNodes[0].data
+
+		#router_ip = sys.argv[1]
 		name = sys.argv[2]
-		trnasTime = 5 * 60 # in seconds 
+		trnasTime = 2 * 60 # in seconds 
 		Type = "machine"
 		print "router ip is : ",router_ip
 		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
@@ -377,7 +389,7 @@ def main():
 	 	myInterface.display_message_list() 
 		status = myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
 		print "status from main", status
-		myScheduler.addHandlerFunc('CANCEL', myScheduler.removeTask)
+		myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
 
 		t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
 		t_handleTasks.start()
@@ -395,8 +407,6 @@ def main():
 				myScheduler.print_elements_queue();
 			elif input_text == 'PRINTFREESLOTS':
 				myScheduler.printSlots()
-			elif input_text =='SIKO':
-				koko = myClass(myInterface.add_handler,myInterface.sendmessage)
 			elif input_text.startswith('TIME'):
 				print "current time: ",datetime.datetime.now()
 	except KeyboardInterrupt:
