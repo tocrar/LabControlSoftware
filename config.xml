@@ -2,5 +2,20 @@
 <!--http://www.tutorialspoint.com/python/python_xml_processing.htm-->
 
 <configs>
-<router_ip>172.16.1.1</router_ip>
+   <common_configs>
+      <router_ip>192.168.1.1</router_ip>
+       <transport_time>1</transport_time>
+   </common_configs>
+
+   <shuttle_configs>
+      <type>shuttle</type>
+      <name>shuttle_1</name>
+   </shuttle_configs>
+
+   <machine_configs>
+       <type>machine</type>
+      <name>machine_4</name>
+      <test>kk</test>
+   </machine_configs>
+
 </configs>

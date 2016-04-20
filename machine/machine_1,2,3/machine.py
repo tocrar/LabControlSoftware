@@ -1,24 +1,24 @@
+#--------------------------------- general includes ----------------------------------#
 import datetime
-import operator
-import sys  
+import operator 
 import signal 
 import os
+import sys
 import time
 import threading 
 from threading import Timer
 from subprocess import call
+import xml.etree.ElementTree as ET
 
-#sys.path.append("../../../tests")
-#from gpiotest import gpio_Interface # works only for beagle bone 
-
-sys.path.append('../../../common')
-from p2p_framework import P2P_Interface 
-
-sys.path.append('../../includes')
+#-------------------------------- project includes ------------------------------------#
+sys.path.append('../includes')
 import machine_queue
 from machine_queue import queueElement
 import timeTest
 from timeTest import myTime
+#sys.path.append("../../../tests")
+#from gpiotest import gpio_Interface # works only for beagle bone 
+
 
 class MachineScheduler():
 
@@ -26,15 +26,16 @@ class MachineScheduler():
 		self.sendMessageFunc = sendMessage 
 		self.addHandlerFunc = addHandler
 		self.shutdown = shutdown 
+		self.__backup_file = 0
+		self.__backup_file_lock = threading.Lock()
 		self.__scheduleFail = False
 		self.__newTask = {}
 		self.__taskDic={}
-		print "current time :",  datetime.datetime.now()
+		print "current time :"+ str(datetime.datetime.now())+"\n" 
 		#self.__gpioInterface = gpio_Interface()
 		#self.__gpioInterface.clearpins()# works only for beagle bone 
 		self.__transportationTime = trnsportTime # works only for beagle bone 
 		signal.signal(signal.SIGINT,self.kill_signal_handler)
-		print "pid is : ",os.getpid()
 	
 	def kill_signal_handler(self,signal,frame):
 		self.shutdown = False
@@ -70,6 +71,40 @@ class MachineScheduler():
 
 	def __del__(self):
 		print "machine destructor......"
+
+	def update_backup_data(self):
+		print "update backup thread started ......"
+		while not self.shutdown[0]:
+			print "update backup called "
+			self.__backup_file_lock.acquire()
+			self.__backup_file = ET.parse('backup_machine.xml')	
+			root = self.__backup_file.getroot()	
+			currentTime = root.find('current_time')
+			currentTime.text = str(self.getCurrentTimeInSeconds()) 
+			queue = root.find('machine_queue')
+			for element in self.__taskDic:
+				temp_element = queue.find(element)
+				temp_Status = temp_element.find('Status')
+				temp_Status.text = str(self.__taskDic[element]._Status)
+				if self.__taskDic[element]._Status == 'Running':
+					self.__taskDic[element]._ProcessingRmainingTime = self.__taskDic[element]._WorstCaseFinishingTime - self.getCurrentTimeInSeconds()
+					#print "remaining processing time: ",self.__taskDic[element]._ProcessingRmainingTime
+
+				temp_EndTime = temp_element.find('EndTime')
+				temp_EndTime.text = str(self.__taskDic[element]._EndTime)
+				temp_Priority = temp_element.find('Priority')
+				temp_Priority.text = str(self.__taskDic[element]._Priority)
+				temp_ProcessingTime = temp_element.find('ProcessingTime')
+				temp_ProcessingTime.text = str(self.__taskDic[element]._ProcessingTime)
+				temp_ProcessingRmainingTime = temp_element.find('ProcessingRmainingTime')
+				temp_ProcessingRmainingTime.text = str(self.__taskDic[element]._ProcessingRmainingTime)
+
+				#print("%s End time %d:%d saved ...."% (element,self.__taskDic[element]._EndTime/3600,((self.__taskDic[element]._EndTime%3600)/60)))
+
+			self.__backup_file.write('backup_machine.xml')
+			self.__backup_file_lock.release()
+			time.sleep(30)
+ 
 	
 	def print_elements_queue(self):
 		print "|\tTask name\t|\tStart Time\t|\tFinish Time\t|\tProcessing Time\t|\tDeadline\t|\tStatus"
@@ -96,10 +131,22 @@ class MachineScheduler():
 	def __removeTask(self,msg):
 		if msg['sendername'] in self.__taskDic:
 			print "Removing..... ",self.__taskDic[msg['sendername']]._Name
+			#acquire lock before using xml file 
+			self.__backup_file_lock.acquire()
+			# remove task from the Backup file 
+			self.__backup_file = ET.parse('backup_machine.xml')	
+			root = self.__backup_file.getroot()	
+			queue = root.find('machine_queue')
+			temp_task = queue.find(msg['sendername'])
+			queue.remove(temp_task)
+			self.__backup_file.write('backup_machine.xml')
+			self.__backup_file_lock.release()
+
+			# remove task from tasks dictionary
 			del self.__taskDic[msg['sendername']]
 			print "Task removed ......" 
 		else:
-			print ("%s: you are trying to remove a not existing task"% self.__removeTask.__name__)
+			print ("%s: you are trying to remove a non existing task"% self.__removeTask.__name__)
 
 #############################################################
 #handler to cancel task scheduling and remove it from the task queue of the machine
@@ -185,8 +232,7 @@ class MachineScheduler():
 
 		return True
 
-					
-
+				
 
 		#user defined function 
 	def taskArrived(self,message): # cannot make it private because it is called outside the class in addhandler
@@ -213,6 +259,18 @@ class MachineScheduler():
 			t=Timer(6,self.__check_confirmation,[message['sendername']]) # argument has to passed as an array 
 			t.start()
 			print "Confirmation Timer started" 
+			# add new entry to xml backup file 
+			self.__backup_file = ET.parse('backup_machine.xml')	
+			root = self.__backup_file.getroot()	
+			queue = root.find('machine_queue')
+			task_element = ET.SubElement(queue,message['sendername'])
+			ET.SubElement(task_element,'EndTime')
+			ET.SubElement(task_element,'Priority')
+			ET.SubElement(task_element,'ProcessingTime')
+			ET.SubElement(task_element,'ProcessingRmainingTime') 
+			ET.SubElement(task_element,'Status')
+			self.__backup_file.write('backup_machine.xml')
+
 		#test fails
 		if(not taskScheduled):
 			del self.__taskDic[message['sendername']]
@@ -243,38 +301,4 @@ class MachineScheduler():
 
 
 
-def main():
-	print os.getpid()
-	print "main statrted ....."
-	shutdown = [False]
-	if len(sys.argv) !=3:
-		print "error"
-		print"Usage : filename.py <router_ip> <send_name>"
-		sys.exit()
-	router_ip = sys.argv[1]
-	name = sys.argv[2]
-	trnasportTime = 2 * 60 # in seconds
-	Type = "machine"
-	print "router ip is : ",router_ip
-	myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-	myScheduler = MachineScheduler(trnasportTime,myInterface.add_handler,myInterface.sendmessage,shutdown)
-	myInterface.display_message_list() 
-	myScheduler.addHandlerFunc('ADD', myScheduler.taskArrived)
-	myScheduler.addHandlerFunc('CANCEL', myScheduler.cancelRequest)
-	myScheduler.addHandlerFunc('CONFIRM', myScheduler.confirmation_received)
-	t_handleTasks = threading.Thread( target = myScheduler.tasksHandler)
-	t_handleTasks.start()
-	while not shutdown[0]:
-		# save the user's input in a variable
-		input_text = raw_input('>>>')
-		#if the user enters 'EXIT', the inifinte while-loop quits and the
-		# program can terminate
-		if input_text == 'EXIT':
-			shutdown[0] = True
-			del myInterface
-		elif input_text == 'PRINTQUEUE':
-			myScheduler.print_elements_queue();
 
-
-if __name__ == "__main__":
-	main()

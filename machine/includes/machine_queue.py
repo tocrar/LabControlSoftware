@@ -1,7 +1,7 @@
 
 class queueElement:
 	def __init__(self,Priority,EndTime,ProcessingTime,name,ContractNum,minStarTime):
-		print "task consructor......."
+		print "machine queue consructor......."
 		self._Name = name
 		self._ProcessingTime = ProcessingTime
 		self._EndTime = EndTime
@@ -17,9 +17,11 @@ class queueElement:
 		self._TempWorstCaseFinishingTime = 0
 		self._ContractNumber = ContractNum
 		self._confirm = False
+		self._gui_row_number = 0 # gui row number reated to this task 
 		self._Status ='Unscheduled' #  ('Running,Scheduled','Unscheduled','Stopped')
 		#print ("new task created with -->> Required processing time  : %s , priority: %s , procssing status : %s , processing left time : %s"  %(self._ProcessingTime ,  self._Priority ,self._processingStatus,self._ProcessingRmainingTime))
-		
+		print "machine queue init done ..... "
+
 	def __del__(self):
 		print "machine queue destructor ......."
 
