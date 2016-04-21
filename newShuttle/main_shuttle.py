@@ -15,6 +15,14 @@ from p2p_framework import P2P_Interface
 from mysql_class import sqldb
 from shuttle import Shuttle
 #--------------------------------------------------------------------------------------#
+#---------------------------------------- global variables ----------------------------#
+
+global_shuttle_container = []
+# lock the shuttle container list  in order not to access it at the same time form different threads 
+shuttle_container_lock = threading.Lock()
+
+
+#--------------------------------------------------------------------------------------#
 
 def getCurrentTimeInSeconds(self):
         currenttime = datetime.datetime.now()
@@ -25,7 +33,7 @@ def getCurrentTimeInSeconds(self):
  
 def shuttle_status(shutdown,Interface,transportTime):
 	status_busy = False
-	shuttle_container = []
+	global global_shuttle_container
 	while not shutdown[0]:
                print "check shuttle status ......."
 	       if not status_busy :
@@ -37,13 +45,14 @@ def shuttle_status(shutdown,Interface,transportTime):
         		passwd = "raspberry"
                         db = "ip"
                         mydb = sqldb(host,user,passwd,db)  
-                        # a request should be snt to the cmd to get  KA_Nummer
+                        # a request should be sent to the cmd to get  KA_Nummer
                         KA_Nummer = 1000022 # I will get this number from the cmd 
                         sql = "SELECT * FROM kundenauftrag WHERE KA_Nummer = %s " % (KA_Nummer)
                         data = mydb.sqlquery(sql)
                         contractNumber = data["rows"][0]["KA_Nummer"]
                         print"KA_Nummer : " , contractNumber
                         print "Auftrag Priority", data["rows"][0]["KA_Prio"]
+                        
                         # get arbeitsplan    
                         #process_vorgeange = [data["rows"][0]["UB"],data["rows"][0]["MO"],data["rows"][0]["LA"],data["rows"][0]["EV"],data["rows"][0]["RF"],data["rows"][0]["CH"]]
                         process_vorgeange = [data["rows"][0]["RF"],data["rows"][0]["CH"]]
@@ -61,7 +70,6 @@ def shuttle_status(shutdown,Interface,transportTime):
                         EndTime = "15:30" 
                         print " expected End Time >> ",EndTime
                         print "Got data from the database !!"
-                        #myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,Interface.add_handler,Interface.sendmessage,Interface.get_address_book,transportTime,contractNumber)
                         # I am passing 2 to contract number (contract number should be in the range [0 - 9])
                         myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,Interface.add_handler,Interface.sendmessage,Interface.get_address_book,transportTime,2)
                         myShuttle.addHandlerFunc('PRINT', myShuttle.print_message)
@@ -70,17 +78,24 @@ def shuttle_status(shutdown,Interface,transportTime):
                         myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
                         myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
                         myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
-               time.sleep(10)
+                        shuttle_container_lock.acquire()
+                        global_shuttle_container.append(myShuttle)
+                        shuttle_container_lock.release()
+                        print "shuttle container: " ,global_shuttle_container
+                        print "shuttle added to the container ...!! "
+               time.sleep(30)
                print" --------------------------------------------------------------"
                if(myShuttle.getStatus()):
                        print "the  current Contract finished ....."
                        print "deleting the current shuttle object "
+                       shuttle_container_lock.acquire()
+                       del global_shuttle_container[0]
+                       shuttle_container_lock.release()
                        del myShuttle
                        print " getting new Contract from database "
                        status_busy = False 
-               
-               #print myShuttle
-               
+              
+               print "shuttle container: " ,global_shuttle_container
              
 
 
@@ -88,6 +103,7 @@ def main():
 
 	try:
 #------------------------------------ INITIALIZATIONS ----------------------------------# 
+		global global_shuttle_container 	
 					
                 print "main statrted ....."
 		print "Process ID : ",os.getpid()
@@ -116,27 +132,8 @@ def main():
 		print "\t type: "	,Type
 		
 
-		#Priority=2
-		#Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'002'}}#,\
-									#'machine_2':{'Name':'machine_2','ProcessingTime':'004'}}
-									
-		#machine4 = {'Name':'machine_4','ProcessingTime':'001'}
-		myInterface = P2P_Interface(shutdown,name,Type,router_ip)
-		#machines = {}
-		##print "Machines_dic : " , Machines_dic
-		#print "Got data from the database !!"
-		
-		#print ("please enter the expected End Time in the form <02:30>")
-		#EndTime = raw_input('>>>')
-		 
-		#myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,myInterface.add_handler,myInterface.sendmessage,myInterface.get_address_book,transportTime)
-		#myShuttle.addHandlerFunc('PRINT', myShuttle.print_message)
-		#myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
-		#myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
-		#myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
-		#myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
 
-		#start shuttle status thread   , shuttle_status(shutdown,Interface,transportTime)
+		#start shuttle status thread  (to track the status of the shuttle [busy or free])_
 		t_shuttle_status = threading.Thread(target = shuttle_status,args=(shutdown,myInterface,transportTime,))
 		t_shuttle_status.start()
 
@@ -167,7 +164,7 @@ def main():
 				print "current time: ",datetime.datetime.now()
 
 			elif input_text.startswith('TARGET'):
-				myShuttle.get_target_list()
+				global_shuttle_container[0].get_target_list()
 
 	except :
 		print ("Error happened in the main function")

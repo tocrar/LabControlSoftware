@@ -254,7 +254,7 @@ class Shuttle:
 
 		sortdtasks = sorted(tasksStartTime.items(),key=operator.itemgetter(1)) 
 		print "sorted tasks according to start time  " , sortdtasks
-		# it returns an ordered list of tuppled [('machine1',1),('machine2',2),('machine3',3)]
+		# it returns an ordered list of tuppled in the form [(sttion_name,start_time)] ------>>  [('machine1',1),('machine2',2),('machine3',3)]
 		return sortdtasks 
 
 
