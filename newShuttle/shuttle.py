@@ -89,6 +89,10 @@ class Shuttle:
                 print "montage station status ",self.__machine_4._Status_Finished
                 temp_finished =  temp_finished and self.__machine_4._Status_Finished
                 print " status for all ",temp_finished
+                if temp_finished:
+                        return True
+                else:
+                        return False 
                
                          
                                           

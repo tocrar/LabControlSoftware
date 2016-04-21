@@ -14,6 +14,7 @@ sys.path.append('../common')
 from p2p_framework import P2P_Interface
 from mysql_class import sqldb
 from shuttle import Shuttle
+#--------------------------------------------------------------------------------------#
 
 def getCurrentTimeInSeconds(self):
         currenttime = datetime.datetime.now()
@@ -54,7 +55,7 @@ def shuttle_status(shutdown,Interface,transportTime):
                                  
                         Priority=2
                         Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'002'}}
-                        machine4 = {'Name':'machine_4','ProcessingTime':'001'} # mantagestation 
+                        machine4 = {'Name':'machine_4','ProcessingTime':'001'} # montagestation 
                         machines = {}
                         print "Machines_dic : " , Machines_dic
                         EndTime = "15:30" 
@@ -70,9 +71,14 @@ def shuttle_status(shutdown,Interface,transportTime):
                         myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
                         myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
                time.sleep(10)
-               myShuttle.getStatus()
-               print myShuttle
-               #del myShuttle
+               print" --------------------------------------------------------------"
+               if(myShuttle.getStatus()):
+                       print "the  current Contract finished ....."
+                       print "deleting the current shuttle object "
+                       del myShuttle
+                       print " getting new Contract from database "
+                       status_busy = False 
+               
                #print myShuttle
                
              
@@ -83,7 +89,7 @@ def main():
 	try:
 #------------------------------------ INITIALIZATIONS ----------------------------------# 
 					
-		print "main statrted ....."
+                print "main statrted ....."
 		print "Process ID : ",os.getpid()
 		shutdown = [False]
 		# data retreived from config.xml file 
