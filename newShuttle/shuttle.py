@@ -68,7 +68,7 @@ class Shuttle:
 			#self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
 		except:
 			print "ERROR whlie initializing shuttle.......  !!!"
-			return 
+
 
 	def kill_signal_handler(self,signal,frame):
 		print "you pressed ctrl+c !!"
@@ -85,10 +85,10 @@ class Shuttle:
                 for machine in self.__machines:
                       print machine
                       temp_finished =  temp_finished and self.__machines[machine]._Status_Finished
-                print"getStatus temp_finished Success: ",temp_finished
-                print "montage station status ",self.__machine_4._Status_Finished
+                print"status of machines finished: ",temp_finished
+                print "montage station status: "+str(self.__machine_4._Status_Finished)+"\n"
                 temp_finished =  temp_finished and self.__machine_4._Status_Finished
-                print " status for all ",temp_finished
+              
                 if temp_finished:
                         return True
                 else:
