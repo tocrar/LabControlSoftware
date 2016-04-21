@@ -11,6 +11,13 @@
       <type>shuttle</type>
       <name>shuttle_1</name>
    </shuttle_configs>
+   
+   <database_configs>
+   	<host>192.168.1.54</host>
+   	<user>Shuttle</user>
+   	<passwd>raspberry</passwd>
+   	<db_name>ip</db_name>
+   </database_configs>
 
    <machine_configs>
        <type>machine</type>
