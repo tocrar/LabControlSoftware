@@ -64,6 +64,7 @@ class Shuttle:
 			# check if machine 4 in address book befor sending it a message  
 			address_book = self.__getAddressBookFunc()
 			print "address book : ",address_book
+			# these 2 lines  must be uncommented again
 			#msg =  str(self.ContractNumber)+str(self.Priority)+str(machine4['ProcessingTime'])+str(self.EndTime)+self.get_machine_4_min_start_time()
 			#self.sendMessageFunc('TCP',machine4['Name'],'','ADD', msg)
 		except:
@@ -255,6 +256,8 @@ class Shuttle:
 		sortdtasks = sorted(tasksStartTime.items(),key=operator.itemgetter(1)) 
 		print "sorted tasks according to start time  " , sortdtasks
 		# it returns an ordered list of tuppled in the form [(sttion_name,start_time)] ------>>  [('machine1',1),('machine2',2),('machine3',3)]
+		print sortdtasks[0][1]
+		print type(sortdtasks[0][1])
 		return sortdtasks 
 
 
