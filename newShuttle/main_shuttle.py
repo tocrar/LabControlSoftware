@@ -57,7 +57,10 @@ def shuttle_status(shutdown,interface,transportTime):
 	shuttle_created = False
 	global global_shuttle_container
 	Interface = interface
-       # mydb = sqldb(host,user,passwd,db) 
+	Priority = 0 
+	Machines_dic ={}
+	machine4 = {}
+	EndTime = 0
 			
         def get_job_from_db(message):
         	print "got response from commander \n"
@@ -69,24 +72,27 @@ def shuttle_status(shutdown,interface,transportTime):
 		                sql = "SELECT * FROM kundenauftrag WHERE KA_Nummer = %s " % (KA_Nummer)
 		                data = mydb.sqlquery(sql)
 		                contractNumber = data["rows"][0]["KA_Nummer"]
+		                EndTime =  data["rows"][0]["KA_Termin"]
 		                print"KA_Nummer : " , contractNumber
 		                print "Auftrag Priority", data["rows"][0]["KA_Prio"]
-		                
+		                print "End Time: ",EndTime
 		                # get arbeitsplan    
 		                #process_vorgeange = [data["rows"][0]["UB"],data["rows"][0]["MO"],data["rows"][0]["LA"],data["rows"][0]["EV"],data["rows"][0]["RF"],data["rows"][0]["CH"]]
 		                process_vorgeange = [data["rows"][0]["RF"],data["rows"][0]["CH"]]
+		                print "process_vorgeange" , process_vorgeange
 		                
 		                for vorgang in process_vorgeange:
-		                        sql = "SELECT * FROM arbeitsplan WHERE arbeitsplan.ID = %s " % (vorgang)
+		                        sql = "SELECT * FROM arbeitsvorgang WHERE arbeitsvorgang.AV_Nummer = %s " % (vorgang)
 		                        plan = mydb.sqlquery(sql)
 		                	print ("Vorgang % d : .... %s\n" % (vorgang,plan))
+		                	print "vorgang processing time: ",plan["rows"][0]['AV_Zykluszeit']
 		                print "Got data from the database !!\n"
 		                got_job_status = True
 			except:
 			    #currentJob = 0
 			    got_job_status = False 
 			    errormsg = KA_Nummer+" reset"
-			    p2p.sendmessage('TCP', "cmd", "Raspberry", "Error", errormsg)
+			    Interface.sendmessage('TCP', "cmd", "Raspberry", "Error", errormsg)
 			    print "db Connection Error"
         	else:
 			time.sleep(10)
@@ -97,7 +103,7 @@ def shuttle_status(shutdown,interface,transportTime):
 	
 			
 	while not shutdown[0]:
-               time.sleep(2)
+               time.sleep(5)
 	       if not status_busy :
 			# I have to check if the commander in address book or not 
 			print "sending request to the cmd ..!!\n"
@@ -105,39 +111,43 @@ def shuttle_status(shutdown,interface,transportTime):
 			
                         # a request should be sent to the cmd to get  KA_Nummer 
                                  
-                        Priority=2
-                        Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'002'}}
-                        machine4 = {'Name':'machine_4','ProcessingTime':'001'} # montagestation 
-                        machines = {}
-                       #print "Machines_dic : " , Machines_dic
-                        EndTime = "15:30" 
+                        #Priority=2
+                       # Machines_dic ={'machine_1':{'Name':'machine_1','ProcessingTime':'002'}}
+                       # machine4 = {'Name':'machine_4','ProcessingTime':'001'} # montagestation 
+                       ##print "Machines_dic : " , Machines_dic
+                       # EndTime = "15:30" 
                         #print " expected End Time >> ",EndTime
                         # I am passing 2 to contract number (contract number should be in the range [0 - 9])
-                        myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,Interface.add_handler,Interface.sendmessage,Interface.get_address_book,trnasportTime,2)
-                        print "myShuttle: "+str(myShuttle)+"\n"
-                        if myShuttle:
-		                myShuttle.addHandlerFunc('PRINT', myShuttle.print_message) 
-		                myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
-		                myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
-		                myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
-		                myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
-		                shuttle_container_lock.acquire()
-		                global_shuttle_container.append(myShuttle)
-		                shuttle_container_lock.release()
-		                print "shuttle container: " ,global_shuttle_container
-		                print "shuttle added to the container ...!! "
-		                status_busy = True
-	       time.sleep(20)
+                        if  got_job_status:
+		                myShuttle = Shuttle(shutdown,Priority,EndTime,Machines_dic,machine4,Interface.add_handler,Interface.sendmessage,Interface.get_address_book,trnasportTime,2)
+		                print "myShuttle: "+str(myShuttle)+"\n"
+		                if myShuttle:
+				        myShuttle.addHandlerFunc('PRINT', myShuttle.print_message) 
+				        myShuttle.addHandlerFunc('SCHEDULED',myShuttle.get_EDF_response)
+				        myShuttle.addHandlerFunc('SCHEDULEFAIL',myShuttle.schedule_fail)
+				        myShuttle.addHandlerFunc('SCHEDULEDM4',myShuttle.get_machine_4_response)
+				        myShuttle.addHandlerFunc('SCHEDULEFAILM4',myShuttle.schedule_fail)
+				        shuttle_container_lock.acquire()
+				        global_shuttle_container.append(myShuttle)
+				        shuttle_container_lock.release()
+				        print "shuttle container: " ,global_shuttle_container
+				        print "shuttle added to the container ...!! "
+				        status_busy = True
+				      
+	       time.sleep(15)
                print" --------------------------------------------------------------"
-               if(myShuttle.getStatus()):
-                       print "the  current Contract finished .....\n"
-                       print "deleting the current shuttle object \n"
-                       shuttle_container_lock.acquire()
-                       del global_shuttle_container[0]
-                       shuttle_container_lock.release()
-                       del myShuttle
-                       print " getting new Contract from database \n"
-                       status_busy = False 
+               if(got_job_status and status_busy):
+               		
+               	      if(myShuttle.getStatus()):
+		               print "the  current Contract finished .....\n"
+		               print "deleting the current shuttle object \n"
+		               shuttle_container_lock.acquire()
+		               del global_shuttle_container[0]
+		               shuttle_container_lock.release()
+		               del myShuttle
+		               print " getting new Contract from database \n"
+		               status_busy = False 
+		               got_job_status = False
               
                print "shuttle container: " ,global_shuttle_container
              
