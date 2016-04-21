@@ -80,7 +80,8 @@ class Shuttle:
 		currenttime = datetime.datetime.now()
 		currenttimeinseconds = ( currenttime.hour * 60 + currenttime.minute ) * 60
 		return currenttimeinseconds
-                
+		
+        # returns True when all tasks done     
         def getStatus(self):
                 temp_finished = True
                 for machine in self.__machines:
